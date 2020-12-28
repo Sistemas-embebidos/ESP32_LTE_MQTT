@@ -1,0 +1,13 @@
+# Target labels
+ bootloader
+# Source files and their labels
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/CMakeFiles/bootloader
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/CMakeFiles/bootloader.rule
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/CMakeFiles/bootloader-complete.rule
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/bootloader-prefix/src/bootloader-stamp/bootloader-install.rule
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/bootloader-prefix/src/bootloader-stamp/bootloader-mkdir.rule
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/bootloader-prefix/src/bootloader-stamp/bootloader-download.rule
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/bootloader-prefix/src/bootloader-stamp/bootloader-update.rule
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/bootloader-prefix/src/bootloader-stamp/bootloader-patch.rule
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/bootloader-prefix/src/bootloader-stamp/bootloader-configure.rule
+C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/bootloader-prefix/src/bootloader-stamp/bootloader-build.rule
