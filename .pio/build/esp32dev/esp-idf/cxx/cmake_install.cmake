@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/JinnKaY/.platformio/packages/framework-espidf/components/cxx
+# Install script for directory: C:/Users/jinnkay/.platformio/packages/framework-espidf/components/cxx
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
