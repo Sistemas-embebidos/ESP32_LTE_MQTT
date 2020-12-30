@@ -10,7 +10,7 @@
 #define MQTT_RATE  30 * ONE_SEC
 #define N_QUEUE 10
 
-#define MSG_FORMAT "{\"t\":%u,\"T\":[%u,%u,%u],\"B\":%u}"
+#define MSG_FORMAT "{\"t\":%u,\"T\":[%u,%u,%u],\"B\":%.2f}"
 static EventGroupHandle_t wifi_event_group; /* FreeRTOS event group to signal when we are connected*/
 
 QueueHandle_t Queue_data,Queue_config;
@@ -34,7 +34,7 @@ static const char *SYSTEM_TAG = "[System]";
 static int s_retry_num = 0;
 
 char configuration[50];
-int threshold = 30;
+int threshold = 5;
 int rate = 30;
 
 esp_mqtt_client_config_t mqtt_cfg = {
@@ -155,31 +155,12 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
             break;
         case MQTT_EVENT_DATA:
             ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DATA");
-            printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-            printf("DATA=%.*s\r\n", event->data_len, event->data);
+            //printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+            //printf("DATA=%.*s\r\n", event->data_len, event->data);
             memcpy(configuration,event->data,event->data_len);
-            printf("DATO=%s\r\n",configuration);
+            //printf("DATO=%s\r\n",configuration);
 
-            char *ptr_1,*ptr_2;
-            char *pt_threshold;
-            char *pt_rate;
-
-            ptr_1 = strtok (configuration,",");
-            ptr_2 = strtok (NULL,",");
-            
-            printf("%s | %s\n",ptr_1,ptr_2);
-        
-            pt_threshold = strtok (ptr_1,":");
-            pt_threshold = strtok (NULL,":");
-
-            pt_rate = strtok (ptr_2,":");
-            pt_rate = strtok (NULL,":");
-
-            pt_rate[strlen(pt_rate)-1] = '\0';
-
-            printf("%s | %s\n",pt_threshold,pt_rate);
-     
-            // Usar ATOI para tener el int
+            xQueueSend( Queue_config, &configuration, portMAX_DELAY);
 
             xEventGroupSetBits(wifi_event_group, GOT_DATA_BIT);
             break;
@@ -311,20 +292,79 @@ static void task_led(void *arg)
 
 static void task_data(void *arg)
 {
-    int valor = 0;
+    int32_t valor[] = {0,0,0,0};
+    int aux;
 
     while(1) {   
-        valor ++;
+        valor[0] = esp_random()/100000000;
+        valor[1] = esp_random()/100000000;
+        valor[2] = esp_random()/100000000;
+
+        aux = adc1_get_raw(ADC1_CHANNEL_6);
+
+        printf("%f || %d\n",3.3*(float)(aux)/0xFFF,threshold);
+
+        if (3.3*(float)(aux)/0xFFF > threshold) {
+            printf("Failed to read battery voltage\n");
+            valor[3] = -1;
+        }
+        else
+        {
+            valor[3] = aux;
+        }
+
         xQueueSend( Queue_data, &valor, portMAX_DELAY);
-        vTaskDelay(MQTT_RATE);
+        vTaskDelay(rate * ONE_SEC);
     } 
 }
 
-static void task_at(void *arg)
+static void task_config(void *arg)
 {
-       while(1) {   
-        printf("AT\n");
-        vTaskDelay(MQTT_RATE);
+   
+    char config[30];
+
+    while(1) {   
+        xQueueReceive( Queue_config, &config, portMAX_DELAY);
+
+        char *ptr_1,*ptr_2;
+        char *pt_threshold;
+        char *pt_rate;
+
+        int aux;
+
+        ptr_1 = strtok (config,",");
+        ptr_2 = strtok (NULL,",");
+        
+        //printf("%s | %s\n",ptr_1,ptr_2);
+    
+        pt_threshold = strtok (ptr_1,":");
+        pt_threshold = strtok (NULL,":");
+
+        pt_rate = strtok (ptr_2,":");
+        pt_rate = strtok (NULL,":");
+
+        pt_rate[strlen(pt_rate)-1] = '\0';
+
+        //printf("%s | %s\n",pt_threshold,pt_rate);
+    
+        // Usar ATOI para tener el int
+        aux = atoi(pt_threshold);
+
+        if (aux > 0)
+        {
+            threshold = aux;
+            ESP_LOGI(SYSTEM_TAG,"Voltage threshold: %d volts",threshold);
+        }
+
+        aux = atoi(pt_rate);
+
+        if (aux > 10)
+        {
+            rate = aux;
+            ESP_LOGI(SYSTEM_TAG,"MQTT rate: %d seconds",rate);
+        }
+
+        vTaskDelay(10* ONE_SEC);
     } 
 }
 
@@ -336,13 +376,13 @@ static void task_mqtt(void *arg)
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
     esp_mqtt_client_start(client);
 
-    int valor;
+    int32_t valor[4];
     char dato[30];
 
     while(1) {   
         xQueueReceive( Queue_data, &valor, portMAX_DELAY);
 
-        sprintf(dato,MSG_FORMAT,esp_log_timestamp(),valor,valor,valor,valor);
+        sprintf(dato,MSG_FORMAT,esp_log_timestamp(),valor[0],valor[1],valor[2], 3.3*(float)(valor[3])/0xFFF);
         esp_mqtt_client_publish(client, "/datos", dato , 0, 1, 0); 
         ESP_LOGI(MQTT_TAG, "Enviando dato por MQTT" );
         vTaskDelay(rate * ONE_SEC);
@@ -380,18 +420,22 @@ void app_main(void)
     ESP_LOGI(WIFI_TAG, "ESP_WIFI_MODE_STA");
     wifi_init_sta();
 
-    Queue_data = xQueueCreate( N_QUEUE , sizeof( int  ) );
+    Queue_data = xQueueCreate( N_QUEUE , sizeof( int32_t[4]  ) );
+    Queue_config = xQueueCreate( N_QUEUE , sizeof( char[30]  ) );
 
-    if( Queue_data == NULL )
+    if( Queue_data == NULL || Queue_config == NULL )
     {
         ESP_LOGE(SYSTEM_TAG,"No se pudo crear la cola");
         while(1);
     }
 
+    adc1_config_width(ADC_WIDTH_12Bit);
+    adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_11db); // Measure up to 2.2V
+
     xTaskCreate(task_led, "task_led", 2048, NULL, 5, NULL);
     xTaskCreate(task_data, "task_data", 2048, NULL, 5, NULL);
     xTaskCreate(task_mqtt, "task_mqtt", 2048, NULL, 5, NULL);
-    xTaskCreate(task_at, "task_at", 2048, NULL, 5, NULL);
+    xTaskCreate(task_config, "task_config", 2048, NULL, 5, NULL);
 }
 
 

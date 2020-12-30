@@ -631,8 +631,8 @@ LOAD c:/users/jinnkay/.platformio/packages/toolchain-xtensa32/bin/../lib/gcc/xte
 LOAD c:/users/jinnkay/.platformio/packages/toolchain-xtensa32/bin/../lib/gcc/xtensa-esp32-elf/8.2.0/no-rtti/crtbegin.o
 START GROUP
 LOAD .pio\build\esp32dev\bootloader\esp-idf\soc\libsoc.a
-LOAD .pio\build\esp32dev\bootloader\esp-idf\micro-ecc\libmicro-ecc.a
 LOAD .pio\build\esp32dev\bootloader\esp-idf\spi_flash\libspi_flash.a
+LOAD .pio\build\esp32dev\bootloader\esp-idf\micro-ecc\libmicro-ecc.a
 LOAD .pio\build\esp32dev\bootloader\esp-idf\main\libmain.a
 LOAD .pio\build\esp32dev\bootloader\esp-idf\bootloader_support\libbootloader_support.a
 LOAD .pio\build\esp32dev\bootloader\esp-idf\efuse\libefuse.a
