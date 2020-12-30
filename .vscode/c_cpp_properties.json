@@ -96,8 +96,7 @@
                 "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/unity/unity/src",
                 "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
                 "C:/Users/jinnkay/.platformio/packages/tool-unity",
-                "",
-                "${workspaceFolder}/.pio/build/esp32dev/bootloader/config"
+                ""
             ],
             "browse": {
                 "limitSymbolsToIncludedHeaders": true,

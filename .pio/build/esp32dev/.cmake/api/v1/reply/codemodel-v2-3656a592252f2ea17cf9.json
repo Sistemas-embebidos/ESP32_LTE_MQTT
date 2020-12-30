@@ -1350,7 +1350,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "Test.elf::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-Test.elf-5196ce8c7903fce3bbbc.json",
+					"jsonFile" : "target-Test.elf-ca0f8d5384b9e0a72199.json",
 					"name" : "Test.elf",
 					"projectIndex" : 0
 				},
@@ -1371,7 +1371,7 @@
 				{
 					"directoryIndex" : 5,
 					"id" : "__idf_app_update::@cc3b426666063acc9674",
-					"jsonFile" : "target-__idf_app_update-fad67e7a6b9449a04175.json",
+					"jsonFile" : "target-__idf_app_update-98dc650050f0c91590d7.json",
 					"name" : "__idf_app_update",
 					"projectIndex" : 1
 				},
@@ -1504,7 +1504,7 @@
 				{
 					"directoryIndex" : 54,
 					"id" : "__idf_esp_local_ctrl::@d6aad58d2946e56208ef",
-					"jsonFile" : "target-__idf_esp_local_ctrl-5609e50a38f462c673bd.json",
+					"jsonFile" : "target-__idf_esp_local_ctrl-f04e9cde9b5c124caa33.json",
 					"name" : "__idf_esp_local_ctrl",
 					"projectIndex" : 1
 				},
@@ -1721,7 +1721,7 @@
 				{
 					"directoryIndex" : 74,
 					"id" : "__idf_src::@2478b13de56d3028f688",
-					"jsonFile" : "target-__idf_src-2f7f445a39f77791e97d.json",
+					"jsonFile" : "target-__idf_src-e011f6c6d376a312019f.json",
 					"name" : "__idf_src",
 					"projectIndex" : 1
 				},
@@ -1770,7 +1770,7 @@
 				{
 					"directoryIndex" : 72,
 					"id" : "__idf_wifi_provisioning::@9d7e7ffe1b15746c1098",
-					"jsonFile" : "target-__idf_wifi_provisioning-53ad51a2b80afc61e021.json",
+					"jsonFile" : "target-__idf_wifi_provisioning-1cddc9c2ffe730560b5c.json",
 					"name" : "__idf_wifi_provisioning",
 					"projectIndex" : 1
 				},
@@ -1791,7 +1791,7 @@
 				{
 					"directoryIndex" : 18,
 					"id" : "__ldgen_output_esp32.project.ld::@c361781f7cb51efad0ea",
-					"jsonFile" : "target-__ldgen_output_esp32.project.ld-8b433511f990c8b7fda9.json",
+					"jsonFile" : "target-__ldgen_output_esp32.project.ld-f4c5fbf65757d71114b8.json",
 					"name" : "__ldgen_output_esp32.project.ld",
 					"projectIndex" : 1
 				},

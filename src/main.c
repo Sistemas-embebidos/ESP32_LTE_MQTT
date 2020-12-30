@@ -1,73 +1,27 @@
 
-#include <stdio.h>
-#include <stdint.h>
-#include <stddef.h>
-#include <string.h>
+#include "main.h"
 
-#include "sdkconfig.h"
-
-#include "driver/gpio.h"
-
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/semphr.h"
-#include "freertos/queue.h"
-#include "freertos/event_groups.h"
-
-#include "esp_system.h"
-#include "esp_spi_flash.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_log.h"
-
-#include "nvs_flash.h"
-#include "tcpip_adapter.h"
-//#include "protocol_examples_common.h"
-
-#include "lwip/err.h"
-#include "lwip/sys.h"
-#include "lwip/sockets.h"
-#include "lwip/dns.h"
-#include "lwip/netdb.h" 
-
-#include "esp_log.h"
-#include "mqtt_client.h"
-
-/* The examples use WiFi configuration that you can set via project configuration menu
-   If you'd rather not, just change the below entries to strings with
-   the config you want - ie #define EXAMPLE_WIFI_SSID "mywifissid"
-*/
 #define ESP_WIFI_SSID      "PruebaTBA"
 #define ESP_WIFI_PASS      "pruebaTBA"
 #define ESP_MAXIMUM_RETRY  5
 
-#define LED_RATE 1000 / portTICK_PERIOD_MS
-#define MQTT_RATE  30 * 1000 / portTICK_PERIOD_MS
+#define ONE_SEC 1000 / portTICK_PERIOD_MS
+#define LED_RATE ONE_SEC
+#define MQTT_RATE  30 * ONE_SEC
 #define N_QUEUE 10
 
 #define MSG_FORMAT "{\"t\":%u,\"T\":[%u,%u,%u],\"B\":%u}"
+static EventGroupHandle_t wifi_event_group; /* FreeRTOS event group to signal when we are connected*/
 
-/* FreeRTOS event group to signal when we are connected*/
-static EventGroupHandle_t wifi_event_group;
-
-QueueHandle_t Queue_data;
+QueueHandle_t Queue_data,Queue_config;
 
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
-#define CONNECTED_BIT BIT0
-#define FAIL_BIT      BIT1
-#define APSTARTED_BIT BIT2
-
-#define CONFIG_BROKER_URL "mqtt://f8caa162:4dfa0cbff7b885ea@broker.shiftr.io"
-
-#define NOMBRE "ESP32_MARTIN"
-
-/* Can use project configuration menu (idf.py menuconfig) to choose the GPIO to blink,
-   or you can edit the following line and set a number here.
-*/
-#define BLINK_GPIO 2
-
+#define CONNECT_BIT BIT0
+#define STOP_BIT      BIT1
+#define GOT_DATA_BIT BIT2
+#define LED_GPIO 2
 
 #define BROKER_URL "mqtt://f8caa162:4dfa0cbff7b885ea@broker.shiftr.io"
 #define NAME "ESP32_MARTIN"
@@ -79,12 +33,34 @@ static const char *SYSTEM_TAG = "[System]";
 
 static int s_retry_num = 0;
 
+char configuration[50];
+int threshold = 30;
+int rate = 30;
+
 esp_mqtt_client_config_t mqtt_cfg = {
         .uri = BROKER_URL,
         .client_id = NAME,
     };
 
 esp_mqtt_client_handle_t client;
+
+static void modem_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    switch (event_id) {
+    case ESP_MODEM_EVENT_PPP_START:
+        ESP_LOGI(LTE_TAG, "Modem PPP Started");
+        break;
+    case ESP_MODEM_EVENT_PPP_STOP:
+        ESP_LOGI(LTE_TAG, "Modem PPP Stopped");
+        xEventGroupSetBits(wifi_event_group, STOP_BIT);
+        break;
+    case ESP_MODEM_EVENT_UNKNOWN:
+        ESP_LOGW(LTE_TAG, "Unknow line received: %s", (char *)event_data);
+        break;
+    default:
+        break;
+    }
+}
 
 static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
@@ -96,7 +72,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
             //s_retry_num++;
             ESP_LOGI(WIFI_TAG, "retry to connect to the AP");
         } else {
-            xEventGroupSetBits(wifi_event_group, FAIL_BIT);
+            xEventGroupSetBits(wifi_event_group, STOP_BIT);
         }
         ESP_LOGI(WIFI_TAG,"connect to the AP fail");
     } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
@@ -104,7 +80,7 @@ static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_
         ESP_LOGI(WIFI_TAG, "got ip:%s",
                  ip4addr_ntoa(&event->ip_info.ip));
         s_retry_num = 0;
-        xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+        xEventGroupSetBits(wifi_event_group, CONNECT_BIT);
     }
 }
 
@@ -114,20 +90,20 @@ esp_err_t esp32_wifi_eventHandler(void *ctx, system_event_t *event) {
         esp_wifi_connect();
         break;
     case SYSTEM_EVENT_STA_GOT_IP:
-        xEventGroupSetBits(wifi_event_group, CONNECTED_BIT);
+        xEventGroupSetBits(wifi_event_group, CONNECT_BIT);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
         /* This is a workaround as ESP32 WiFi libs don't currently
            auto-reassociate. */
         esp_wifi_connect();
-        xEventGroupClearBits(wifi_event_group, CONNECTED_BIT);
+        xEventGroupClearBits(wifi_event_group, CONNECT_BIT);
         break;
     case SYSTEM_EVENT_AP_START:
-        xEventGroupSetBits(wifi_event_group, APSTARTED_BIT);
+        xEventGroupSetBits(wifi_event_group, GOT_DATA_BIT);
         ESP_LOGD(LTE_TAG, "AP Started");
         break;
     case SYSTEM_EVENT_AP_STOP:
-        xEventGroupClearBits(wifi_event_group, APSTARTED_BIT);
+        xEventGroupClearBits(wifi_event_group, GOT_DATA_BIT);
         ESP_LOGD(LTE_TAG, "AP Stopped");
         break;
     case SYSTEM_EVENT_AP_STACONNECTED:
@@ -149,6 +125,79 @@ esp_err_t esp32_wifi_eventHandler(void *ctx, system_event_t *event) {
 	return ESP_OK;
 }
 
+static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
+{
+    esp_mqtt_client_handle_t client = event->client;
+    int msg_id;
+    switch (event->event_id) {
+        case MQTT_EVENT_CONNECTED:
+            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_CONNECTED");
+            msg_id = esp_mqtt_client_subscribe(client, "/configuracion", 0);
+            ESP_LOGI(MQTT_TAG, "sent subscribe successful, msg_id=%d", msg_id);
+
+            //msg_id = esp_mqtt_client_publish(client, "/configuracion/conexion", "dia/mes/año hh:mm:ss", 0, 1, 0);
+            //ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
+            
+            break;
+        case MQTT_EVENT_DISCONNECTED:
+            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DISCONNECTED");
+            break;
+        case MQTT_EVENT_SUBSCRIBED:
+            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
+            msg_id = esp_mqtt_client_publish(client, "/configuracion/conexion", "suscripto", 0, 0, 0);
+            ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
+            break;
+        case MQTT_EVENT_UNSUBSCRIBED:
+            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+            break;
+        case MQTT_EVENT_PUBLISHED:
+            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+            break;
+        case MQTT_EVENT_DATA:
+            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DATA");
+            printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
+            printf("DATA=%.*s\r\n", event->data_len, event->data);
+            memcpy(configuration,event->data,event->data_len);
+            printf("DATO=%s\r\n",configuration);
+
+            char *ptr_1,*ptr_2;
+            char *pt_threshold;
+            char *pt_rate;
+
+            ptr_1 = strtok (configuration,",");
+            ptr_2 = strtok (NULL,",");
+            
+            printf("%s | %s\n",ptr_1,ptr_2);
+        
+            pt_threshold = strtok (ptr_1,":");
+            pt_threshold = strtok (NULL,":");
+
+            pt_rate = strtok (ptr_2,":");
+            pt_rate = strtok (NULL,":");
+
+            pt_rate[strlen(pt_rate)-1] = '\0';
+
+            printf("%s | %s\n",pt_threshold,pt_rate);
+     
+            // Usar ATOI para tener el int
+
+            xEventGroupSetBits(wifi_event_group, GOT_DATA_BIT);
+            break;
+        case MQTT_EVENT_ERROR:
+            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_ERROR");
+            break;
+        default:
+            ESP_LOGI(MQTT_TAG, "Other event id:%d", event->event_id);
+            break;
+    }
+    return ESP_OK;
+}
+
+static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
+    ESP_LOGD(MQTT_TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
+    mqtt_event_handler_cb(event_data);
+}
+
 void wifi_init_sta()
 {
     wifi_event_group = xEventGroupCreate();
@@ -160,8 +209,7 @@ void wifi_init_sta()
     #else
         ESP_ERROR_CHECK( esp_event_loop_init(esp32_wifi_eventHandler, NULL));
     #endif
-
-
+    
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
@@ -188,14 +236,14 @@ void wifi_init_sta()
 
     ESP_LOGI(WIFI_TAG, "wifi_init_sta finished.");
 
-    /* Waiting until either the connection is established (WIFI_CONNECTED_BIT) or connection failed for the maximum
-     * number of re-tries (WIFI_FAIL_BIT). The bits are set by event_handler() (see above) */
-    EventBits_t bits = xEventGroupWaitBits(wifi_event_group, CONNECTED_BIT | FAIL_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
+    /* Waiting until either the connection is established (WIFI_CONNECT_BIT) or connection failed for the maximum
+     * number of re-tries (WIFI_STOP_BIT). The bits are set by event_handler() (see above) */
+    EventBits_t bits = xEventGroupWaitBits(wifi_event_group, CONNECT_BIT | STOP_BIT, pdFALSE, pdFALSE, portMAX_DELAY);
 
     /* xEventGroupWaitBits() returns the bits before the call returned, hence we can test which event actually happened. */
-    if (bits & CONNECTED_BIT) {
+    if (bits & CONNECT_BIT) {
         ESP_LOGI(WIFI_TAG, "connected to ap SSID:%s password:%s", ESP_WIFI_SSID, ESP_WIFI_PASS);
-    } else if (bits & FAIL_BIT) {
+    } else if (bits & STOP_BIT) {
         ESP_LOGI(WIFI_TAG, "Failed to connect to SSID:%s, password:%s", ESP_WIFI_SSID, ESP_WIFI_PASS);
     } else {
         ESP_LOGE(WIFI_TAG, "UNEXPECTED EVENT");
@@ -206,64 +254,57 @@ void wifi_init_sta()
     //vEventGroupDelete(wifi_event_group);
 }
 
-static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
+static void on_ppp_changed(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
-    esp_mqtt_client_handle_t client = event->client;
-    int msg_id;
-    // your_context_t *context = event->context;
-    switch (event->event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_CONNECTED");
-            msg_id = esp_mqtt_client_publish(client, "/configuracion/conexion", "dia/mes/año hh:mm:ss", 0, 1, 0);
-            ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
-
-            msg_id = esp_mqtt_client_subscribe(client, "/configuracion/conexion", 0);
-            ESP_LOGI(MQTT_TAG, "sent subscribe successful, msg_id=%d", msg_id);
-            break;
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DISCONNECTED");
-            break;
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            msg_id = esp_mqtt_client_publish(client, "/configuracion/conexion", "suscripto", 0, 0, 0);
-            ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
-            break;
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_PUBLISHED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_DATA:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DATA");
-            printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-            printf("DATA=%.*s\r\n", event->data_len, event->data);
-            break;
-        case MQTT_EVENT_ERROR:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_ERROR");
-            break;
-        default:
-            ESP_LOGI(MQTT_TAG, "Other event id:%d", event->event_id);
-            break;
+    ESP_LOGI(LTE_TAG, "PPP state changed event %d", event_id);
+    if (event_id == NETIF_PPP_ERRORUSER) {
+        /* User interrupted event from esp-netif */
+        esp_netif_t *netif = event_data;
+        ESP_LOGI(LTE_TAG, "User interrupted event from netif:%p", netif);
     }
-    return ESP_OK;
 }
 
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
-    ESP_LOGD(MQTT_TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
-    mqtt_event_handler_cb(event_data);
+static void on_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+{
+    ESP_LOGD(LTE_TAG, "IP event! %d", event_id);
+    if (event_id == IP_EVENT_PPP_GOT_IP) {
+        esp_netif_dns_info_t dns_info;
+
+        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
+        esp_netif_t *netif = event->esp_netif;
+
+        ESP_LOGI(LTE_TAG, "Modem Connect to PPP Server");
+        ESP_LOGI(LTE_TAG, "~~~~~~~~~~~~~~");
+        ESP_LOGI(LTE_TAG, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
+        ESP_LOGI(LTE_TAG, "Netmask     : " IPSTR, IP2STR(&event->ip_info.netmask));
+        ESP_LOGI(LTE_TAG, "Gateway     : " IPSTR, IP2STR(&event->ip_info.gw));
+        esp_netif_get_dns_info(netif, 0, &dns_info);
+        ESP_LOGI(LTE_TAG, "Name Server1: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
+        esp_netif_get_dns_info(netif, 1, &dns_info);
+        ESP_LOGI(LTE_TAG, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
+        ESP_LOGI(LTE_TAG, "~~~~~~~~~~~~~~");
+        xEventGroupSetBits(wifi_event_group, CONNECT_BIT);
+
+        ESP_LOGI(LTE_TAG, "GOT ip event!!!");
+    } else if (event_id == IP_EVENT_PPP_LOST_IP) {
+        ESP_LOGI(LTE_TAG, "Modem Disconnect from PPP Server");
+    } else if (event_id == IP_EVENT_GOT_IP6) {
+        ESP_LOGI(LTE_TAG, "GOT IPv6 event!");
+
+        ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
+        ESP_LOGI(LTE_TAG, "Got IPv6 address " IPV6STR, IPV62STR(event->ip6_info.ip));
+    }
 }
 
 static void task_led(void *arg)
 {
-      gpio_reset_pin(BLINK_GPIO);
-    /* Set the GPIO as a push/pull output */
-    gpio_set_direction(BLINK_GPIO, GPIO_MODE_OUTPUT);
+    gpio_reset_pin(LED_GPIO);
+    gpio_set_direction(LED_GPIO, GPIO_MODE_OUTPUT); // Set the GPIO as a push/pull output
 
     while(1) {       
-        gpio_set_level(BLINK_GPIO, 0);          // Blink off (output low)
+        gpio_set_level(LED_GPIO, 0);          // Blink off (output low)
         vTaskDelay(LED_RATE);  
-        gpio_set_level(BLINK_GPIO, 1);          // Blink on (output high)
+        gpio_set_level(LED_GPIO, 1);          // Blink on (output high)
         vTaskDelay(LED_RATE);
     } 
 }
@@ -275,6 +316,14 @@ static void task_data(void *arg)
     while(1) {   
         valor ++;
         xQueueSend( Queue_data, &valor, portMAX_DELAY);
+        vTaskDelay(MQTT_RATE);
+    } 
+}
+
+static void task_at(void *arg)
+{
+       while(1) {   
+        printf("AT\n");
         vTaskDelay(MQTT_RATE);
     } 
 }
@@ -293,10 +342,10 @@ static void task_mqtt(void *arg)
     while(1) {   
         xQueueReceive( Queue_data, &valor, portMAX_DELAY);
 
-        sprintf(dato,MSG_FORMAT,valor,valor,valor,valor,valor);
+        sprintf(dato,MSG_FORMAT,esp_log_timestamp(),valor,valor,valor,valor);
         esp_mqtt_client_publish(client, "/datos", dato , 0, 1, 0); 
         ESP_LOGI(MQTT_TAG, "Enviando dato por MQTT" );
-        vTaskDelay(MQTT_RATE);
+        vTaskDelay(rate * ONE_SEC);
     } 
 }
 
@@ -342,6 +391,7 @@ void app_main(void)
     xTaskCreate(task_led, "task_led", 2048, NULL, 5, NULL);
     xTaskCreate(task_data, "task_data", 2048, NULL, 5, NULL);
     xTaskCreate(task_mqtt, "task_mqtt", 2048, NULL, 5, NULL);
+    xTaskCreate(task_at, "task_at", 2048, NULL, 5, NULL);
 }
 
 
