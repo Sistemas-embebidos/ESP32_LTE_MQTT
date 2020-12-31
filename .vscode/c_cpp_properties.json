@@ -10,6 +10,7 @@
             "includePath": [
                 "c:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/include",
                 "c:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/src",
+                "c:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/libdeps/esp32dev/ESPAsync_WiFiManager/src",
                 "C:/Users/JinnKaY/.platformio/packages/framework-espidf/components/xtensa/include",
                 "C:/Users/JinnKaY/.platformio/packages/framework-espidf/components/xtensa/esp32/include",
                 "C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/config",
@@ -105,6 +106,7 @@
                 "path": [
                     "c:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/include",
                     "c:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/src",
+                    "c:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/libdeps/esp32dev/ESPAsync_WiFiManager/src",
                     "C:/Users/JinnKaY/.platformio/packages/framework-espidf/components/xtensa/include",
                     "C:/Users/JinnKaY/.platformio/packages/framework-espidf/components/xtensa/esp32/include",
                     "C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/config",

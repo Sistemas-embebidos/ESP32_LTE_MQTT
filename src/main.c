@@ -5,10 +5,22 @@
 #define ESP_WIFI_PASS      "pruebaTBA"
 #define ESP_MAXIMUM_RETRY  5
 
+#define THRESHOLD_DEFAULT 50
+#define RATE_DEFAULT 30
+#define RATE_MIN 10
+#define TEMP_MIN 0
+#define STRING_LENGTH 30
+
+char configuration[STRING_LENGTH];
+int threshold = THRESHOLD_DEFAULT;
+int rate = RATE_DEFAULT;
+
 #define ONE_SEC 1000 / portTICK_PERIOD_MS
-#define LED_RATE ONE_SEC
-#define MQTT_RATE  30 * ONE_SEC
-#define N_QUEUE 10
+#define LED_RATE 1 * ONE_SEC
+#define ADC_RATE rate * ONE_SEC
+#define MQTT_RATE  rate * ONE_SEC
+#define CONFIG_RATE rate * ONE_SEC
+#define N_QUEUE 20  
 
 #define DATA_FORMAT "{\"t\":%u,\"T\":[%u,%u,%u],\"B\":%.2f}"
 #define STATE_FORMAT "{\"t\":%u,\"s\":\"%s\"}"
@@ -20,29 +32,39 @@ QueueHandle_t Queue_data,Queue_config;
 /* The event group allows multiple bits for each event, but we only care about two events:
  * - we are connected to the AP with an IP
  * - we failed to connect after the maximum amount of retries */
-#define CONNECT_BIT BIT0
-#define STOP_BIT      BIT1
-#define GOT_DATA_BIT BIT2
+#define CONNECT_BIT     BIT0
+#define STOP_BIT        BIT1
+#define GOT_DATA_BIT    BIT2
 #define LED_GPIO 2
+#define OFF 0
+#define ON 1
 
-#define BROKER_URL "mqtt://f8caa162:4dfa0cbff7b885ea@broker.shiftr.io"
+#define BROKER_USER "f8caa162"
+#define BROKER_PASS "4dfa0cbff7b885ea"
+#define BROKER_HOST "broker.shiftr.io"
+
+//#define BROKER_URL "mqtt://f8caa162:4dfa0cbff7b885ea@broker.shiftr.io"
+#define BROKER_URL "mqtt://" BROKER_USER ":" BROKER_PASS "@" BROKER_HOST
+
 #define NAME "ESP32_MARTIN"
 
-#define NO_DC_INPUT "BATTERY_ONLY"
-#define DC_INPUT "DC_CONNECTED"
+#define DC_DISCONNECTED_MSG "BATTERY_ONLY"
+#define DC_CONNECTED_MSG "DC_CONNECTED"
 #define HIGH_TEMPERATURE "HIGH_TEMP"
 #define NORMAL_TEMPERATURE "NORMAL_TEMP"
 
-static const char *LTE_TAG = "[LTE]";
-static const char *WIFI_TAG = "[WiFi]";
-static const char *MQTT_TAG = "[MQTT]";
-static const char *SYSTEM_TAG = "[System]";
+#define LTE_TAG "[LTE]"
+#define WIFI_TAG "[WiFi]"
+#define MQTT_TAG "[MQTT]"
+#define SYSTEM_TAG "[System]"
+
+#define STATE_TOPIC "/states"
+#define DATA_TOPIC "/data"
+#define CONFIG_TOPIC "/configuration"
+
+#define STORAGE_NAMESPACE "storage"
 
 static int s_retry_num = 0;
-
-char configuration[50];
-int threshold = 5;
-int rate = 30;
 
 esp_mqtt_client_config_t mqtt_cfg = {
         .uri = BROKER_URL,
@@ -50,6 +72,31 @@ esp_mqtt_client_config_t mqtt_cfg = {
     };
 
 esp_mqtt_client_handle_t client;
+
+typedef struct
+{
+    uint32_t timestamp;
+    uint32_t temperature_1;
+    uint32_t temperature_2;
+    uint32_t temperature_3;
+    uint32_t battery;
+} data_t;
+
+typedef struct
+{
+    uint32_t timestamp;
+    uint32_t state;
+} state_t;
+
+typedef enum
+{
+    DC_DISCONNECTED,
+    DC_CONNECTING,
+    DC_CONNECTED,
+    DC_DISCONNECTING
+} dc_state_t;
+
+dc_state_t dc_state = DC_DISCONNECTED;
 
 static void modem_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -100,8 +147,7 @@ esp_err_t esp32_wifi_eventHandler(void *ctx, system_event_t *event) {
         xEventGroupSetBits(wifi_event_group, CONNECT_BIT);
         break;
     case SYSTEM_EVENT_STA_DISCONNECTED:
-        /* This is a workaround as ESP32 WiFi libs don't currently
-           auto-reassociate. */
+        /* This is a workaround as ESP32 WiFi libs don't currently auto-reassociate. */
         esp_wifi_connect();
         xEventGroupClearBits(wifi_event_group, CONNECT_BIT);
         break;
@@ -139,7 +185,7 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(MQTT_TAG, "MQTT_EVENT_CONNECTED");
-            msg_id = esp_mqtt_client_subscribe(client, "/configuracion", 0);
+            msg_id = esp_mqtt_client_subscribe(client, CONFIG_TOPIC, 0);
             ESP_LOGI(MQTT_TAG, "sent subscribe successful, msg_id=%d", msg_id);  
             break;
         case MQTT_EVENT_DISCONNECTED:
@@ -278,50 +324,219 @@ static void on_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id
     }
 }
 
+/* Save the number of module restarts in NVS by first reading and then incrementing the number 
+that has been saved previously. Return an error if anything goes wrong during this process. */
+esp_err_t save_restart_counter(void)
+{
+    nvs_handle_t my_handle;
+    esp_err_t err;
+
+    // Open
+    err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) return err;
+
+    // Read
+    int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
+    err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+    // Write
+    restart_counter++;
+    err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
+    if (err != ESP_OK) return err;
+
+    char* prueba = "{\"prueba\":5}";
+    nvs_set_str(my_handle,"datas",prueba);
+
+    // Commit written value.
+    // After setting any values, nvs_commit() must be called to ensure changes are written
+    // to flash storage. Implementations may write to storage at other times,
+    // but this is not guaranteed.
+    err = nvs_commit(my_handle);
+    if (err != ESP_OK) return err;
+
+    // Close
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
+/* Save new run time value in NVS by first reading a table of previously saved values and then adding the new value 
+  at the end of the table. Return an error if anything goes wrong during this process. */
+esp_err_t save_run_time(void)
+{
+    nvs_handle_t my_handle;
+    esp_err_t err;
+
+    // Open
+    err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) return err;
+
+    // Read the size of memory space required for blob
+    size_t required_size = 0;  // value will default to 0, if not set yet in NVS
+    err = nvs_get_blob(my_handle, "run_time", NULL, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+
+    // Read previously saved blob if available
+    uint32_t* run_time = malloc(required_size + sizeof(uint32_t));
+    if (required_size > 0) {
+        err = nvs_get_blob(my_handle, "run_time", run_time, &required_size);
+        if (err != ESP_OK) {
+            free(run_time);
+            return err;
+        }
+    }
+
+    // Write value including previously saved blob if available
+    required_size += sizeof(uint32_t);
+    run_time[required_size / sizeof(uint32_t) - 1] = esp_log_timestamp();
+    err = nvs_set_blob(my_handle, "run_time", run_time, required_size);
+    free(run_time);
+
+    if (err != ESP_OK) return err;
+
+    // Commit
+    err = nvs_commit(my_handle);
+    if (err != ESP_OK) return err;
+
+    // Close
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
+/* Read from NVS and print restart counter and the table with run times.
+   Return an error if anything goes wrong during this process. */
+esp_err_t print_what_saved(void)
+{
+    nvs_handle_t my_handle;
+    esp_err_t err;
+
+    // Open
+    err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
+    if (err != ESP_OK) return err;
+
+    // Read restart counter
+    int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
+    err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+    printf("Restart counter = %d\n", restart_counter);
+
+    char prueba[20];
+    uint32_t size_L;
+
+    nvs_get_blob(my_handle, "datas", NULL, &size_L);
+    nvs_get_str(my_handle, "datas", prueba, &size_L);
+    printf("Datos = %.*s\n", size_L, prueba);
+
+    // Read run time blob
+    size_t required_size = 0;  // value will default to 0, if not set yet in NVS
+    // obtain required memory space to store blob being read from NVS
+    err = nvs_get_blob(my_handle, "run_time", NULL, &required_size);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+    printf("Run time:\n");
+    if (required_size == 0) {
+        printf("Nothing saved yet!\n");
+    } else {
+        uint32_t* run_time = malloc(required_size);
+        err = nvs_get_blob(my_handle, "run_time", run_time, &required_size);
+        if (err != ESP_OK) {
+            free(run_time);
+            return err;
+        }
+       // for (int i = 0; i < required_size / sizeof(uint32_t); i++) {
+            printf("%d: %d | %d\n", required_size / sizeof(uint32_t), run_time[required_size / sizeof(uint32_t)],esp_log_timestamp());
+        //}
+        free(run_time);
+    }
+
+    // Close
+    nvs_close(my_handle);
+    return ESP_OK;
+}
+
 static void task_led(void *arg)
 {
     gpio_reset_pin(LED_GPIO);
     gpio_set_direction(LED_GPIO, GPIO_MODE_OUTPUT); // Set the GPIO as a push/pull output
 
     while(1) {       
-        gpio_set_level(LED_GPIO, 0);          // Blink off (output low)
+        gpio_set_level(LED_GPIO, OFF);          // Blink off (output low)
         vTaskDelay(LED_RATE);  
-        gpio_set_level(LED_GPIO, 1);          // Blink on (output high)
+        gpio_set_level(LED_GPIO, ON);          // Blink on (output high)
         vTaskDelay(LED_RATE);
     } 
 }
 
-static void task_data(void *arg)
+static void task_adc_read(void *arg)
 {
-    int32_t value[] = {0,0,0,0};
-    int aux;
-    while(1) {   
-        value[0] = esp_random()/100000000;
-        value[1] = esp_random()/100000000;
-        value[2] = esp_random()/100000000;
+    esp_err_t err;
 
-        aux = adc1_get_raw(ADC1_CHANNEL_6);
+    data_t datas;
 
-        printf("%f || %d\n",3.3*(float)(aux)/0xFFF,threshold);
+    char data[STRING_LENGTH];
 
-        if (aux == 0 ) {
-            ESP_LOGI(SYSTEM_TAG,"No DC input");
-            value[3] = 0;
-        }
-        else
+    while(1) {  
+        datas.timestamp = esp_log_timestamp();
+        datas.temperature_1 = esp_random()/100000000;
+        datas.temperature_2 = esp_random()/100000000;
+        datas.temperature_3 = esp_random()/100000000;
+        datas.battery = adc1_get_raw(ADC1_CHANNEL_6);
+
+        printf("%f || %d\n",3.3*(float)(datas.battery)/0xFFF,threshold);
+
+        err = print_what_saved();
+        if (err != ESP_OK) printf("Error (%s) reading data from NVS!\n", esp_err_to_name(err));
+
+        err = save_run_time();
+        if (err != ESP_OK) printf("Error (%s) saving restart counter to NVS!\n", esp_err_to_name(err));
+
+        switch(dc_state)
         {
-            ESP_LOGI(SYSTEM_TAG,"DC input available");
-            value[3] = aux;  
+            case DC_DISCONNECTED:
+            {
+                if (datas.battery > 0)
+                    dc_state = DC_CONNECTING;
+                break;
+            }
+            case DC_CONNECTING:
+            {
+                if (datas.battery > 0)
+                {
+                    sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_CONNECTED_MSG);
+                    esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    dc_state = DC_CONNECTED;
+                    ESP_LOGI(SYSTEM_TAG,DC_CONNECTED_MSG);
+                }
+                break;
+            }
+            case DC_CONNECTED:
+            {
+                if (datas.battery == 0)
+                    dc_state = DC_DISCONNECTING;
+                break;
+            }
+            case DC_DISCONNECTING:
+            {
+                if (datas.battery == 0)
+                {
+                    sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_DISCONNECTED_MSG);
+                    esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    dc_state = DC_DISCONNECTED;
+                    ESP_LOGI(SYSTEM_TAG,DC_DISCONNECTED_MSG);
+                }
+                break;
+            }
+            default:
+                dc_state = DC_CONNECTED;
         }
 
-        xQueueSend( Queue_data, &value, portMAX_DELAY);
-        vTaskDelay(rate * ONE_SEC);
+        xQueueSend( Queue_data, &datas, portMAX_DELAY);
+        vTaskDelay(ADC_RATE);
     } 
 }
 
 static void task_config(void *arg)
 {
-    char config[30];
+    char config[STRING_LENGTH];
 
     while(1) {   
         xQueueReceive( Queue_config, &config, portMAX_DELAY);
@@ -350,7 +565,7 @@ static void task_config(void *arg)
         // Usar ATOI para tener el int
         aux = atoi(pt_threshold);
 
-        if (aux > 0)
+        if (aux > TEMP_MIN)
         {
             threshold = aux;
             ESP_LOGI(SYSTEM_TAG,"Temperature threshold: %d °C",threshold);
@@ -358,13 +573,13 @@ static void task_config(void *arg)
 
         aux = atoi(pt_rate);
 
-        if (aux > 10)
+        if (aux > RATE_MIN)
         {
             rate = aux;
             ESP_LOGI(SYSTEM_TAG,"MQTT rate: %d seconds",rate);
         }
 
-        vTaskDelay(10* ONE_SEC);
+        vTaskDelay(CONFIG_RATE);
     } 
 }
 
@@ -376,44 +591,46 @@ static void task_mqtt(void *arg)
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
     esp_mqtt_client_start(client);
 
-    int32_t value[4];
-    char data[30];
-    int32_t prev_battery_value = 1;
+    data_t datas;
+    char data[STRING_LENGTH];
     bool temperature_alert = false;
+    bool battery_alert = false;
 
     while(1) {   
-        xQueueReceive( Queue_data, &value, portMAX_DELAY);
+        xQueueReceive( Queue_data, &datas, portMAX_DELAY);
 
-        if (value[3] == 0)
+        /*
+        if (datas.battery == 0)
         {
-            if ( prev_battery_value != 0 )
+            if ( battery_alert )
             {
-                sprintf(data,STATE_FORMAT,esp_log_timestamp(),NO_DC_INPUT);
-                esp_mqtt_client_publish(client, "/states", data , 0, 1, 0); 
-                prev_battery_value = value[3];
+                sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_DISCONNECTED_MSG);
+                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                battery_alert = false;
             }
         }
         else
         {
-            if ( prev_battery_value == 0 )
+            if ( ! battery_alert )
             {
-                sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_INPUT);
-                esp_mqtt_client_publish(client, "/states", data , 0, 1, 0); 
-                prev_battery_value = value[3];
+                sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_CONNECTED_MSG);
+                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                battery_alert = true;
             }
         }
+        */
 
-        printf("%u %u %u\n",value[0],value[1],value[2]);
-        sprintf(data,DATA_FORMAT,esp_log_timestamp(),value[0],value[1],value[2], 3.3*(float)(value[3])/0xFFF);
-        esp_mqtt_client_publish(client, "/data", data , 0, 1, 0); 
+        printf("%u %u %u\n",datas.temperature_1,datas.temperature_2,datas.temperature_3);
+        sprintf(data,DATA_FORMAT,esp_log_timestamp(),datas.temperature_1,datas.temperature_2,datas.temperature_3, 3.3*(float)(datas.battery)/0xFFF);
+        esp_mqtt_client_publish(client, DATA_TOPIC, data , 0, 1, 0); 
 
-        if ( value[0] < threshold && value[1] < threshold && value[2] < threshold )
+        if ( datas.temperature_1 < threshold && datas.temperature_2 < threshold && datas.temperature_3 < threshold )
         {
             if ( temperature_alert )
             {
                 ESP_LOGI(MQTT_TAG, "Normal Temperature" );
                 sprintf(data,STATE_FORMAT,esp_log_timestamp(),NORMAL_TEMPERATURE);
-                esp_mqtt_client_publish(client, "/states", data , 0, 1, 0); 
+                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                 temperature_alert = false;
             }
         }
@@ -423,11 +640,10 @@ static void task_mqtt(void *arg)
             {
                 ESP_LOGI(MQTT_TAG, "High Temperature" );
                 sprintf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
-                esp_mqtt_client_publish(client, "/states", data , 0, 1, 0); 
+                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                 temperature_alert = true;
             }
-        }
-        
+        }     
         ESP_LOGI(MQTT_TAG, "Sending data by MQTT" );
         vTaskDelay(rate * ONE_SEC);
     } 
@@ -436,7 +652,7 @@ static void task_mqtt(void *arg)
 void app_main(void)
 {
     printf("#################################################################\n");
-
+    
     // Print chip information 
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
@@ -461,11 +677,17 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
+    ret = print_what_saved();
+    if (ret != ESP_OK) printf("Error (%s) reading data from NVS!\n", esp_err_to_name(ret));
+
+    ret = save_restart_counter();
+    if (ret != ESP_OK) printf("Error (%s) saving restart counter to NVS!\n", esp_err_to_name(ret));
+
     ESP_LOGI(WIFI_TAG, "ESP_WIFI_MODE_STA");
     wifi_init_sta();
 
-    Queue_data = xQueueCreate( N_QUEUE , sizeof( int32_t[4]  ) );
-    Queue_config = xQueueCreate( N_QUEUE , sizeof( char[30]  ) );
+    Queue_data = xQueueCreate( N_QUEUE , sizeof( data_t ) );
+    Queue_config = xQueueCreate( N_QUEUE , sizeof( char[STRING_LENGTH]  ) );
 
     if( Queue_data == NULL || Queue_config == NULL )
     {
@@ -477,10 +699,9 @@ void app_main(void)
     adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_11db); // Measure up to 2.2V
 
     xTaskCreate(task_led, "task_led", 2048, NULL, 5, NULL);
-    xTaskCreate(task_data, "task_data", 2048, NULL, 5, NULL);
+    xTaskCreate(task_adc_read, "task_adc_read", 2048, NULL, 5, NULL);
     xTaskCreate(task_mqtt, "task_mqtt", 2048, NULL, 5, NULL);
     xTaskCreate(task_config, "task_config", 2048, NULL, 5, NULL);
-    //xTaskCreate(task_json, "task_json", 2048, NULL, 5, NULL);
 }
 
 
