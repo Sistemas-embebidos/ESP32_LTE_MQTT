@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esp_ringbuf
+# Install script for directory: C:/Users/JinnKaY/.platformio/packages/framework-espidf/components/esp_ringbuf
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

@@ -10,7 +10,9 @@
 #define MQTT_RATE  30 * ONE_SEC
 #define N_QUEUE 10
 
-#define MSG_FORMAT "{\"t\":%u,\"T\":[%u,%u,%u],\"B\":%.2f}"
+#define DATA_FORMAT "{\"t\":%u,\"T\":[%u,%u,%u],\"B\":%.2f}"
+#define STATE_FORMAT "{\"t\":%u,\"s\":\"%s\"}"
+
 static EventGroupHandle_t wifi_event_group; /* FreeRTOS event group to signal when we are connected*/
 
 QueueHandle_t Queue_data,Queue_config;
@@ -25,6 +27,11 @@ QueueHandle_t Queue_data,Queue_config;
 
 #define BROKER_URL "mqtt://f8caa162:4dfa0cbff7b885ea@broker.shiftr.io"
 #define NAME "ESP32_MARTIN"
+
+#define NO_DC_INPUT "BATTERY_ONLY"
+#define DC_INPUT "DC_CONNECTED"
+#define HIGH_TEMPERATURE "HIGH_TEMP"
+#define NORMAL_TEMPERATURE "NORMAL_TEMP"
 
 static const char *LTE_TAG = "[LTE]";
 static const char *WIFI_TAG = "[WiFi]";
@@ -133,19 +140,13 @@ static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
         case MQTT_EVENT_CONNECTED:
             ESP_LOGI(MQTT_TAG, "MQTT_EVENT_CONNECTED");
             msg_id = esp_mqtt_client_subscribe(client, "/configuracion", 0);
-            ESP_LOGI(MQTT_TAG, "sent subscribe successful, msg_id=%d", msg_id);
-
-            //msg_id = esp_mqtt_client_publish(client, "/configuracion/conexion", "dia/mes/año hh:mm:ss", 0, 1, 0);
-            //ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
-            
+            ESP_LOGI(MQTT_TAG, "sent subscribe successful, msg_id=%d", msg_id);  
             break;
         case MQTT_EVENT_DISCONNECTED:
             ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DISCONNECTED");
             break;
         case MQTT_EVENT_SUBSCRIBED:
             ESP_LOGI(MQTT_TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            msg_id = esp_mqtt_client_publish(client, "/configuracion/conexion", "suscripto", 0, 0, 0);
-            ESP_LOGI(MQTT_TAG, "sent publish successful, msg_id=%d", msg_id);
             break;
         case MQTT_EVENT_UNSUBSCRIBED:
             ESP_LOGI(MQTT_TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
@@ -292,35 +293,34 @@ static void task_led(void *arg)
 
 static void task_data(void *arg)
 {
-    int32_t valor[] = {0,0,0,0};
+    int32_t value[] = {0,0,0,0};
     int aux;
-
     while(1) {   
-        valor[0] = esp_random()/100000000;
-        valor[1] = esp_random()/100000000;
-        valor[2] = esp_random()/100000000;
+        value[0] = esp_random()/100000000;
+        value[1] = esp_random()/100000000;
+        value[2] = esp_random()/100000000;
 
         aux = adc1_get_raw(ADC1_CHANNEL_6);
 
         printf("%f || %d\n",3.3*(float)(aux)/0xFFF,threshold);
 
-        if (3.3*(float)(aux)/0xFFF > threshold) {
-            printf("Failed to read battery voltage\n");
-            valor[3] = -1;
+        if (aux == 0 ) {
+            ESP_LOGI(SYSTEM_TAG,"No DC input");
+            value[3] = 0;
         }
         else
         {
-            valor[3] = aux;
+            ESP_LOGI(SYSTEM_TAG,"DC input available");
+            value[3] = aux;  
         }
 
-        xQueueSend( Queue_data, &valor, portMAX_DELAY);
+        xQueueSend( Queue_data, &value, portMAX_DELAY);
         vTaskDelay(rate * ONE_SEC);
     } 
 }
 
 static void task_config(void *arg)
 {
-   
     char config[30];
 
     while(1) {   
@@ -353,7 +353,7 @@ static void task_config(void *arg)
         if (aux > 0)
         {
             threshold = aux;
-            ESP_LOGI(SYSTEM_TAG,"Voltage threshold: %d volts",threshold);
+            ESP_LOGI(SYSTEM_TAG,"Temperature threshold: %d °C",threshold);
         }
 
         aux = atoi(pt_rate);
@@ -370,21 +370,65 @@ static void task_config(void *arg)
 
 static void task_mqtt(void *arg)
 {
-    ESP_LOGI(MQTT_TAG, "Iniciando MQTT" );
+    ESP_LOGI(MQTT_TAG, "Starting MQTT ..." );
 
     client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
     esp_mqtt_client_start(client);
 
-    int32_t valor[4];
-    char dato[30];
+    int32_t value[4];
+    char data[30];
+    int32_t prev_battery_value = 1;
+    bool temperature_alert = false;
 
     while(1) {   
-        xQueueReceive( Queue_data, &valor, portMAX_DELAY);
+        xQueueReceive( Queue_data, &value, portMAX_DELAY);
 
-        sprintf(dato,MSG_FORMAT,esp_log_timestamp(),valor[0],valor[1],valor[2], 3.3*(float)(valor[3])/0xFFF);
-        esp_mqtt_client_publish(client, "/datos", dato , 0, 1, 0); 
-        ESP_LOGI(MQTT_TAG, "Enviando dato por MQTT" );
+        if (value[3] == 0)
+        {
+            if ( prev_battery_value != 0 )
+            {
+                sprintf(data,STATE_FORMAT,esp_log_timestamp(),NO_DC_INPUT);
+                esp_mqtt_client_publish(client, "/states", data , 0, 1, 0); 
+                prev_battery_value = value[3];
+            }
+        }
+        else
+        {
+            if ( prev_battery_value == 0 )
+            {
+                sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_INPUT);
+                esp_mqtt_client_publish(client, "/states", data , 0, 1, 0); 
+                prev_battery_value = value[3];
+            }
+        }
+
+        printf("%u %u %u\n",value[0],value[1],value[2]);
+        sprintf(data,DATA_FORMAT,esp_log_timestamp(),value[0],value[1],value[2], 3.3*(float)(value[3])/0xFFF);
+        esp_mqtt_client_publish(client, "/data", data , 0, 1, 0); 
+
+        if ( value[0] < threshold && value[1] < threshold && value[2] < threshold )
+        {
+            if ( temperature_alert )
+            {
+                ESP_LOGI(MQTT_TAG, "Normal Temperature" );
+                sprintf(data,STATE_FORMAT,esp_log_timestamp(),NORMAL_TEMPERATURE);
+                esp_mqtt_client_publish(client, "/states", data , 0, 1, 0); 
+                temperature_alert = false;
+            }
+        }
+        else
+        {
+            if (! temperature_alert )
+            {
+                ESP_LOGI(MQTT_TAG, "High Temperature" );
+                sprintf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
+                esp_mqtt_client_publish(client, "/states", data , 0, 1, 0); 
+                temperature_alert = true;
+            }
+        }
+        
+        ESP_LOGI(MQTT_TAG, "Sending data by MQTT" );
         vTaskDelay(rate * ONE_SEC);
     } 
 }
@@ -425,7 +469,7 @@ void app_main(void)
 
     if( Queue_data == NULL || Queue_config == NULL )
     {
-        ESP_LOGE(SYSTEM_TAG,"No se pudo crear la cola");
+        ESP_LOGE(SYSTEM_TAG,"Not enough memory for queue");
         while(1);
     }
 
@@ -436,6 +480,7 @@ void app_main(void)
     xTaskCreate(task_data, "task_data", 2048, NULL, 5, NULL);
     xTaskCreate(task_mqtt, "task_mqtt", 2048, NULL, 5, NULL);
     xTaskCreate(task_config, "task_config", 2048, NULL, 5, NULL);
+    //xTaskCreate(task_json, "task_json", 2048, NULL, 5, NULL);
 }
 
 
