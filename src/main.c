@@ -6,14 +6,19 @@
 #define ESP_MAXIMUM_RETRY  5
 
 #define THRESHOLD_DEFAULT 50
-#define RATE_DEFAULT 30
+#define RATE_DEFAULT 15
 #define RATE_MIN 10
 #define TEMP_MIN 0
-#define STRING_LENGTH 30
+#define STRING_LENGTH 40
+
+#define MAX_BUFFER_RING 100
 
 char configuration[STRING_LENGTH];
 int threshold = THRESHOLD_DEFAULT;
 int rate = RATE_DEFAULT;
+
+//uint32_t data_saved_counter = 0, data_sent_counter = 0;
+bool energia = false;
 
 #define ONE_SEC 1000 / portTICK_PERIOD_MS
 #define LED_RATE 1 * ONE_SEC
@@ -80,6 +85,7 @@ typedef struct
     uint32_t temperature_2;
     uint32_t temperature_3;
     uint32_t battery;
+    bool temperature_alert;
 } data_t;
 
 typedef struct
@@ -324,9 +330,7 @@ static void on_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id
     }
 }
 
-/* Save the number of module restarts in NVS by first reading and then incrementing the number 
-that has been saved previously. Return an error if anything goes wrong during this process. */
-esp_err_t save_restart_counter(void)
+esp_err_t save_read_data(data_t datas)
 {
     nvs_handle_t my_handle;
     esp_err_t err;
@@ -336,22 +340,25 @@ esp_err_t save_restart_counter(void)
     if (err != ESP_OK) return err;
 
     // Read
-    int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
-    err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+    int32_t data_saved_counter = 0; // value will default to 0, if not set yet in NVS
+    err = nvs_get_i32(my_handle, "saved_counter", &data_saved_counter);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
 
     // Write
-    restart_counter++;
-    err = nvs_set_i32(my_handle, "restart_counter", restart_counter);
+    data_saved_counter++;
+    err = nvs_set_i32(my_handle, "saved_counter", data_saved_counter);
     if (err != ESP_OK) return err;
 
-    char* prueba = "{\"prueba\":5}";
-    nvs_set_str(my_handle,"datas",prueba);
+    char prueba[STRING_LENGTH];
+    char idx[10];
+
+    sprintf(idx,"idx_%d",data_saved_counter % MAX_BUFFER_RING);
+    sprintf(prueba,DATA_FORMAT,datas.timestamp,datas.temperature_1,datas.temperature_2,datas.temperature_3,3.3*(float)(datas.battery)/0xFFF);
+    printf("%s\n",prueba);
+
+    nvs_set_str(my_handle,idx,prueba);
 
     // Commit written value.
-    // After setting any values, nvs_commit() must be called to ensure changes are written
-    // to flash storage. Implementations may write to storage at other times,
-    // but this is not guaranteed.
     err = nvs_commit(my_handle);
     if (err != ESP_OK) return err;
 
@@ -360,9 +367,7 @@ esp_err_t save_restart_counter(void)
     return ESP_OK;
 }
 
-/* Save new run time value in NVS by first reading a table of previously saved values and then adding the new value 
-  at the end of the table. Return an error if anything goes wrong during this process. */
-esp_err_t save_run_time(void)
+esp_err_t print_saved_data(void)
 {
     nvs_handle_t my_handle;
     esp_err_t err;
@@ -371,81 +376,44 @@ esp_err_t save_run_time(void)
     err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
     if (err != ESP_OK) return err;
 
-    // Read the size of memory space required for blob
-    size_t required_size = 0;  // value will default to 0, if not set yet in NVS
-    err = nvs_get_blob(my_handle, "run_time", NULL, &required_size);
+    // Read saved counter
+    int32_t data_saved_counter = 0; // value will default to 0, if not set yet in NVS
+    err = nvs_get_i32(my_handle, "saved_counter", &data_saved_counter);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+    //printf("Saved counter = %d\n", data_saved_counter);
 
-    // Read previously saved blob if available
-    uint32_t* run_time = malloc(required_size + sizeof(uint32_t));
-    if (required_size > 0) {
-        err = nvs_get_blob(my_handle, "run_time", run_time, &required_size);
-        if (err != ESP_OK) {
-            free(run_time);
-            return err;
-        }
-    }
-
-    // Write value including previously saved blob if available
-    required_size += sizeof(uint32_t);
-    run_time[required_size / sizeof(uint32_t) - 1] = esp_log_timestamp();
-    err = nvs_set_blob(my_handle, "run_time", run_time, required_size);
-    free(run_time);
-
-    if (err != ESP_OK) return err;
-
-    // Commit
-    err = nvs_commit(my_handle);
-    if (err != ESP_OK) return err;
-
-    // Close
-    nvs_close(my_handle);
-    return ESP_OK;
-}
-
-/* Read from NVS and print restart counter and the table with run times.
-   Return an error if anything goes wrong during this process. */
-esp_err_t print_what_saved(void)
-{
-    nvs_handle_t my_handle;
-    esp_err_t err;
-
-    // Open
-    err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
-    if (err != ESP_OK) return err;
-
-    // Read restart counter
-    int32_t restart_counter = 0; // value will default to 0, if not set yet in NVS
-    err = nvs_get_i32(my_handle, "restart_counter", &restart_counter);
+    // Read sent counter
+    int32_t data_sent_counter = 0; // value will default to 0, if not set yet in NVS
+    err = nvs_get_i32(my_handle, "sent_counter", &data_sent_counter);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("Restart counter = %d\n", restart_counter);
+    //printf("Sent counter = %d\n", data_sent_counter);
 
-    char prueba[20];
+    char prueba[STRING_LENGTH];
     uint32_t size_L;
+    char idx[10];
+    int i = 0;
 
-    nvs_get_blob(my_handle, "datas", NULL, &size_L);
-    nvs_get_str(my_handle, "datas", prueba, &size_L);
-    printf("Datos = %.*s\n", size_L, prueba);
-
-    // Read run time blob
-    size_t required_size = 0;  // value will default to 0, if not set yet in NVS
-    // obtain required memory space to store blob being read from NVS
-    err = nvs_get_blob(my_handle, "run_time", NULL, &required_size);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("Run time:\n");
-    if (required_size == 0) {
+    printf("Transmision rafaga:\n");
+    if (data_saved_counter == 0) {
         printf("Nothing saved yet!\n");
     } else {
-        uint32_t* run_time = malloc(required_size);
-        err = nvs_get_blob(my_handle, "run_time", run_time, &required_size);
-        if (err != ESP_OK) {
-            free(run_time);
-            return err;
+        for (i = data_sent_counter; i <= data_saved_counter; i++) {
+            
+            sprintf(idx,"idx_%d",data_sent_counter % MAX_BUFFER_RING );
+            printf("%d (%d) de %d \n",data_sent_counter, data_sent_counter % MAX_BUFFER_RING, data_saved_counter);
+
+            nvs_get_blob(my_handle, idx, NULL, &size_L);
+            nvs_get_str(my_handle, idx, prueba, &size_L);
+            printf("Datos(%d) = %.*s\n", size_L,size_L, prueba);
+            printf("%s\n",prueba);
+
+            //nvs_erase_key(my_handle,idx);
+
+            data_sent_counter++;
+            err = nvs_set_i32(my_handle, "sent_counter", data_sent_counter);
+            if (err != ESP_OK) return err;
         }
-       // for (int i = 0; i < required_size / sizeof(uint32_t); i++) {
-            printf("%d: %d | %d\n", required_size / sizeof(uint32_t), run_time[required_size / sizeof(uint32_t)],esp_log_timestamp());
-        //}
-        free(run_time);
+    
     }
 
     // Close
@@ -468,9 +436,8 @@ static void task_led(void *arg)
 
 static void task_adc_read(void *arg)
 {
-    esp_err_t err;
-
     data_t datas;
+    datas.temperature_alert = false;
 
     char data[STRING_LENGTH];
 
@@ -481,18 +448,34 @@ static void task_adc_read(void *arg)
         datas.temperature_3 = esp_random()/100000000;
         datas.battery = adc1_get_raw(ADC1_CHANNEL_6);
 
-        printf("%f || %d\n",3.3*(float)(datas.battery)/0xFFF,threshold);
+        //printf("%f || %d\n",3.3*(float)(datas.battery)/0xFFF,threshold);
 
-        err = print_what_saved();
-        if (err != ESP_OK) printf("Error (%s) reading data from NVS!\n", esp_err_to_name(err));
-
-        err = save_run_time();
-        if (err != ESP_OK) printf("Error (%s) saving restart counter to NVS!\n", esp_err_to_name(err));
+        if ( datas.temperature_1 < threshold && datas.temperature_2 < threshold && datas.temperature_3 < threshold )
+        {
+            if ( datas.temperature_alert )
+            {
+                ESP_LOGI(MQTT_TAG, "Normal Temperature" );
+                sprintf(data,STATE_FORMAT,esp_log_timestamp(),NORMAL_TEMPERATURE);
+                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                datas.temperature_alert = false;
+            }
+        }
+        else
+        {
+            if (! datas.temperature_alert )
+            {
+                ESP_LOGI(MQTT_TAG, "High Temperature" );
+                sprintf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
+                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                datas.temperature_alert = true;
+            }
+        }  
 
         switch(dc_state)
         {
             case DC_DISCONNECTED:
             {
+                energia = false;
                 if (datas.battery > 0)
                     dc_state = DC_CONNECTING;
                 break;
@@ -510,6 +493,7 @@ static void task_adc_read(void *arg)
             }
             case DC_CONNECTED:
             {
+                energia = true;
                 if (datas.battery == 0)
                     dc_state = DC_DISCONNECTING;
                 break;
@@ -529,7 +513,9 @@ static void task_adc_read(void *arg)
                 dc_state = DC_CONNECTED;
         }
 
-        xQueueSend( Queue_data, &datas, portMAX_DELAY);
+        printf("Guardar dato\n");
+        save_read_data(datas);
+        //xQueueSend( Queue_data, &datas, portMAX_DELAY);
         vTaskDelay(ADC_RATE);
     } 
 }
@@ -593,63 +579,36 @@ static void task_mqtt(void *arg)
 
     data_t datas;
     char data[STRING_LENGTH];
-    bool temperature_alert = false;
-    bool battery_alert = false;
+
+    nvs_handle_t my_handle;
+    esp_err_t err;
 
     while(1) {   
+
+        if (energia)
+        {
+            printf("enviando por MQTT\n");
+
+            print_saved_data();
+        }
+        /*
         xQueueReceive( Queue_data, &datas, portMAX_DELAY);
 
-        /*
-        if (datas.battery == 0)
-        {
-            if ( battery_alert )
-            {
-                sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_DISCONNECTED_MSG);
-                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
-                battery_alert = false;
-            }
-        }
-        else
-        {
-            if ( ! battery_alert )
-            {
-                sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_CONNECTED_MSG);
-                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
-                battery_alert = true;
-            }
-        }
-        */
+        save_data_sent();
+        print_what_saved();
 
         printf("%u %u %u\n",datas.temperature_1,datas.temperature_2,datas.temperature_3);
         sprintf(data,DATA_FORMAT,esp_log_timestamp(),datas.temperature_1,datas.temperature_2,datas.temperature_3, 3.3*(float)(datas.battery)/0xFFF);
         esp_mqtt_client_publish(client, DATA_TOPIC, data , 0, 1, 0); 
 
-        if ( datas.temperature_1 < threshold && datas.temperature_2 < threshold && datas.temperature_3 < threshold )
-        {
-            if ( temperature_alert )
-            {
-                ESP_LOGI(MQTT_TAG, "Normal Temperature" );
-                sprintf(data,STATE_FORMAT,esp_log_timestamp(),NORMAL_TEMPERATURE);
-                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
-                temperature_alert = false;
-            }
-        }
-        else
-        {
-            if (! temperature_alert )
-            {
-                ESP_LOGI(MQTT_TAG, "High Temperature" );
-                sprintf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
-                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
-                temperature_alert = true;
-            }
-        }     
+           
+        */
         ESP_LOGI(MQTT_TAG, "Sending data by MQTT" );
         vTaskDelay(rate * ONE_SEC);
     } 
 }
 
-void app_main(void)
+void start_system(void)
 {
     printf("#################################################################\n");
     
@@ -664,10 +623,15 @@ void app_main(void)
 
     ESP_LOGI(SYSTEM_TAG,"silicon revision %d, ", chip_info.revision);
 
-    ESP_LOGI(SYSTEM_TAG,"%dMB %s flash\n", spi_flash_get_chip_size() / (1024 * 1024),
+    ESP_LOGI(SYSTEM_TAG,"%dMB %s flash", spi_flash_get_chip_size() / (1024 * 1024),
             (chip_info.features & CHIP_FEATURE_EMB_FLASH) ? "embedded" : "external");
 
-    ESP_LOGI(SYSTEM_TAG,"Minimum free heap size: %d bytes\n", esp_get_minimum_free_heap_size());
+    ESP_LOGI(SYSTEM_TAG,"Minimum free heap size: %d bytes", esp_get_minimum_free_heap_size());
+}
+
+void app_main(void)
+{
+    start_system();
     
     //Initialize NVS
     esp_err_t ret = nvs_flash_init();
@@ -677,14 +641,17 @@ void app_main(void)
     }
     ESP_ERROR_CHECK(ret);
 
-    ret = print_what_saved();
+    ret = print_saved_data();
     if (ret != ESP_OK) printf("Error (%s) reading data from NVS!\n", esp_err_to_name(ret));
 
-    ret = save_restart_counter();
-    if (ret != ESP_OK) printf("Error (%s) saving restart counter to NVS!\n", esp_err_to_name(ret));
+    //ret = save_read_data();
+    //if (ret != ESP_OK) printf("Error (%s) saving restart counter to NVS!\n", esp_err_to_name(ret));
 
     ESP_LOGI(WIFI_TAG, "ESP_WIFI_MODE_STA");
     wifi_init_sta();
+
+    adc1_config_width(ADC_WIDTH_12Bit);
+    adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_11db); // Measure up to 2.2V
 
     Queue_data = xQueueCreate( N_QUEUE , sizeof( data_t ) );
     Queue_config = xQueueCreate( N_QUEUE , sizeof( char[STRING_LENGTH]  ) );
@@ -694,9 +661,6 @@ void app_main(void)
         ESP_LOGE(SYSTEM_TAG,"Not enough memory for queue");
         while(1);
     }
-
-    adc1_config_width(ADC_WIDTH_12Bit);
-    adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_11db); // Measure up to 2.2V
 
     xTaskCreate(task_led, "task_led", 2048, NULL, 5, NULL);
     xTaskCreate(task_adc_read, "task_adc_read", 2048, NULL, 5, NULL);
