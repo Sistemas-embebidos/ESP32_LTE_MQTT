@@ -9,7 +9,7 @@
 #define RATE_DEFAULT 15
 #define RATE_MIN 10
 #define TEMP_MIN 0
-#define STRING_LENGTH 40
+#define STRING_LENGTH 50
 
 #define MAX_BUFFER_RING 100
 
@@ -354,7 +354,7 @@ esp_err_t save_read_data(data_t datas)
 
     sprintf(idx,"idx_%d",data_saved_counter % MAX_BUFFER_RING);
     sprintf(prueba,DATA_FORMAT,datas.timestamp,datas.temperature_1,datas.temperature_2,datas.temperature_3,3.3*(float)(datas.battery)/0xFFF);
-    printf("%s\n",prueba);
+    printf("<%s> %s\n",idx,prueba);
 
     nvs_set_str(my_handle,idx,prueba);
 
@@ -388,8 +388,7 @@ esp_err_t print_saved_data(void)
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
     //printf("Sent counter = %d\n", data_sent_counter);
 
-    char prueba[STRING_LENGTH];
-    uint32_t size_L;
+    uint32_t size_L = 0;
     char idx[10];
     int i = 0;
 
@@ -400,20 +399,21 @@ esp_err_t print_saved_data(void)
         for (i = data_sent_counter; i <= data_saved_counter; i++) {
             
             sprintf(idx,"idx_%d",data_sent_counter % MAX_BUFFER_RING );
-            printf("%d (%d) de %d \n",data_sent_counter, data_sent_counter % MAX_BUFFER_RING, data_saved_counter);
+            printf("%d (%d) de %d en %s\n",data_sent_counter, data_sent_counter % MAX_BUFFER_RING, data_saved_counter,idx);
+           
+            nvs_get_str(my_handle, idx, NULL, &size_L);
+            char* read_value = malloc(size_L);
+            nvs_get_str(my_handle, idx, read_value, &size_L);
 
-            nvs_get_blob(my_handle, idx, NULL, &size_L);
-            nvs_get_str(my_handle, idx, prueba, &size_L);
-            printf("Datos(%d) = %.*s\n", size_L,size_L, prueba);
-            printf("%s\n",prueba);
+            printf("Datos(%d) = %.*s\n", size_L,size_L, read_value);
+            esp_mqtt_client_publish(client, DATA_TOPIC, read_value , 0, 1, 0); 
 
-            //nvs_erase_key(my_handle,idx);
+            free(read_value);
 
             data_sent_counter++;
             err = nvs_set_i32(my_handle, "sent_counter", data_sent_counter);
             if (err != ESP_OK) return err;
         }
-    
     }
 
     // Close
@@ -577,11 +577,11 @@ static void task_mqtt(void *arg)
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
     esp_mqtt_client_start(client);
 
-    data_t datas;
-    char data[STRING_LENGTH];
+    //data_t datas;
+    //char data[STRING_LENGTH];
 
-    nvs_handle_t my_handle;
-    esp_err_t err;
+    //nvs_handle_t my_handle;
+    //esp_err_t err;
 
     while(1) {   
 
@@ -593,15 +593,9 @@ static void task_mqtt(void *arg)
         }
         /*
         xQueueReceive( Queue_data, &datas, portMAX_DELAY);
-
-        save_data_sent();
-        print_what_saved();
-
         printf("%u %u %u\n",datas.temperature_1,datas.temperature_2,datas.temperature_3);
         sprintf(data,DATA_FORMAT,esp_log_timestamp(),datas.temperature_1,datas.temperature_2,datas.temperature_3, 3.3*(float)(datas.battery)/0xFFF);
-        esp_mqtt_client_publish(client, DATA_TOPIC, data , 0, 1, 0); 
-
-           
+        esp_mqtt_client_publish(client, DATA_TOPIC, data , 0, 1, 0);      
         */
         ESP_LOGI(MQTT_TAG, "Sending data by MQTT" );
         vTaskDelay(rate * ONE_SEC);

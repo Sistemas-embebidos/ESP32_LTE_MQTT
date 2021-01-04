@@ -12,9 +12,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug",
-            "executable": "c:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/firmware.elf",
+            "executable": "g:/ESP32_LTE_MQTT/.pio/build/esp32dev/firmware.elf",
             "projectEnvName": "esp32dev",
-            "toolchainBinDir": "C:/Users/JinnKaY/.platformio/packages/toolchain-xtensa32/bin",
+            "toolchainBinDir": "C:/Users/jinnkay/.platformio/packages/toolchain-xtensa32/bin",
             "preLaunchTask": {
                 "type": "PlatformIO",
                 "task": "Pre-Debug"
@@ -25,9 +25,9 @@
             "type": "platformio-debug",
             "request": "launch",
             "name": "PIO Debug (skip Pre-Debug)",
-            "executable": "c:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/firmware.elf",
+            "executable": "g:/ESP32_LTE_MQTT/.pio/build/esp32dev/firmware.elf",
             "projectEnvName": "esp32dev",
-            "toolchainBinDir": "C:/Users/JinnKaY/.platformio/packages/toolchain-xtensa32/bin",
+            "toolchainBinDir": "C:/Users/jinnkay/.platformio/packages/toolchain-xtensa32/bin",
             "internalConsoleOptions": "openOnSessionStart"
         }
     ]
