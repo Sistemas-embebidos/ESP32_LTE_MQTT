@@ -178,7 +178,7 @@ build rebuild_cache: phony CMakeFiles/rebuild_cache.util
 # Custom command for CMakeFiles\confserver
 
 build CMakeFiles/confserver: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/prepare_kconfig_files.py --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/confserver.py --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env --kconfig C:/Users/jinnkay/.platformio/packages/framework-espidf/Kconfig --sdkconfig-rename C:/Users/jinnkay/.platformio/packages/framework-espidf/sdkconfig.rename --config G:/ESP32_LTE_MQTT/sdkconfig"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/prepare_kconfig_files.py --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/confserver.py --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env --kconfig C:/Users/jinnkay/.platformio/packages/framework-espidf/Kconfig --sdkconfig-rename C:/Users/jinnkay/.platformio/packages/framework-espidf/sdkconfig.rename --config G:/ESP32_LTE_MQTT/sdkconfig"
   pool = console
 
 
@@ -186,7 +186,7 @@ build CMakeFiles/confserver: CUSTOM_COMMAND
 # Custom command for CMakeFiles\erase_flash
 
 build CMakeFiles/erase_flash: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D C:\Users\jinnkay\.platformio\packages\framework-espidf\components\esptool_py && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -D IDF_PATH="C:/Users/jinnkay/.platformio/packages/framework-espidf" -D ESPTOOLPY="C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/esptool/esptool.py --chip esp32" -D ESPTOOL_ARGS="erase_flash" -P run_esptool.cmake"
+  COMMAND = cmd.exe /C "cd /D C:\Users\jinnkay\.platformio\packages\framework-espidf\components\esptool_py && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -D IDF_PATH="C:/Users/jinnkay/.platformio/packages/framework-espidf" -D ESPTOOLPY="c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/esptool/esptool.py --chip esp32" -D ESPTOOL_ARGS="erase_flash" -P run_esptool.cmake"
   pool = console
 
 
@@ -200,7 +200,7 @@ build CMakeFiles/app: phony || _project_elf_src bootloader.elf esp-idf/bootloade
 # Custom command for CMakeFiles\menuconfig
 
 build CMakeFiles/menuconfig: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/prepare_kconfig_files.py --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/confgen.py --kconfig C:/Users/jinnkay/.platformio/packages/framework-espidf/Kconfig --sdkconfig-rename C:/Users/jinnkay/.platformio/packages/framework-espidf/sdkconfig.rename --config G:/ESP32_LTE_MQTT/sdkconfig --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env --env IDF_TARGET=esp32 --dont-write-deprecated --output config G:/ESP32_LTE_MQTT/sdkconfig && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/check_term.py && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -E env COMPONENT_KCONFIGS_SOURCE_FILE=G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/kconfigs.in COMPONENT_KCONFIGS_PROJBUILD_SOURCE_FILE=G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/kconfigs_projbuild.in IDF_CMAKE=y KCONFIG_CONFIG=G:/ESP32_LTE_MQTT/sdkconfig IDF_TARGET=esp32 C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/menuconfig.py C:/Users/jinnkay/.platformio/packages/framework-espidf/Kconfig && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/confgen.py --kconfig C:/Users/jinnkay/.platformio/packages/framework-espidf/Kconfig --sdkconfig-rename C:/Users/jinnkay/.platformio/packages/framework-espidf/sdkconfig.rename --config G:/ESP32_LTE_MQTT/sdkconfig --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env --env IDF_TARGET=esp32 --output config G:/ESP32_LTE_MQTT/sdkconfig"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/prepare_kconfig_files.py --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/confgen.py --kconfig C:/Users/jinnkay/.platformio/packages/framework-espidf/Kconfig --sdkconfig-rename C:/Users/jinnkay/.platformio/packages/framework-espidf/sdkconfig.rename --config G:/ESP32_LTE_MQTT/sdkconfig --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env --env IDF_TARGET=esp32 --dont-write-deprecated --output config G:/ESP32_LTE_MQTT/sdkconfig && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/check_term.py && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -E env COMPONENT_KCONFIGS_SOURCE_FILE=G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/kconfigs.in COMPONENT_KCONFIGS_PROJBUILD_SOURCE_FILE=G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/kconfigs_projbuild.in IDF_CMAKE=y KCONFIG_CONFIG=G:/ESP32_LTE_MQTT/sdkconfig IDF_TARGET=esp32 c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/menuconfig.py C:/Users/jinnkay/.platformio/packages/framework-espidf/Kconfig && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/kconfig_new/confgen.py --kconfig C:/Users/jinnkay/.platformio/packages/framework-espidf/Kconfig --sdkconfig-rename C:/Users/jinnkay/.platformio/packages/framework-espidf/sdkconfig.rename --config G:/ESP32_LTE_MQTT/sdkconfig --env-file G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/config.env --env IDF_TARGET=esp32 --output config G:/ESP32_LTE_MQTT/sdkconfig"
   pool = console
 
 
@@ -214,7 +214,7 @@ build CMakeFiles/gen_project_binary: phony .bin_timestamp || _project_elf_src bo
 # Custom command for .bin_timestamp
 
 build .bin_timestamp: CUSTOM_COMMAND bootloader.elf || _project_elf_src bootloader.elf esp-idf/bootloader_support/libbootloader_support.a esp-idf/efuse/libefuse.a esp-idf/log/liblog.a esp-idf/main/libmain.a esp-idf/micro-ecc/libmicro-ecc.a esp-idf/soc/libsoc.a esp-idf/spi_flash/libspi_flash.a
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/esptool/esptool.py --chip esp32 elf2image --flash_mode dio --flash_freq 40m --flash_size 2MB -o G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.bin bootloader.elf && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -E echo "Generated G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.bin" && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -E md5sum G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.bin > G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/.bin_timestamp"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/esptool/esptool.py --chip esp32 elf2image --flash_mode dio --flash_freq 40m --flash_size 2MB -o G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.bin bootloader.elf && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -E echo "Generated G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.bin" && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -E md5sum G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.bin > G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/.bin_timestamp"
   DESC = Generating binary image from built executable
   restat = 1
 
@@ -223,7 +223,7 @@ build .bin_timestamp: CUSTOM_COMMAND bootloader.elf || _project_elf_src bootload
 # Custom command for CMakeFiles\flash
 
 build CMakeFiles/flash: CUSTOM_COMMAND C$:/Users/jinnkay/.platformio/packages/framework-espidf/components/bootloader/subproject/partition_table C$:/Users/jinnkay/.platformio/packages/framework-espidf/components/bootloader/subproject/bootloader || _project_elf_src app bootloader.elf esp-idf/bootloader_support/libbootloader_support.a esp-idf/efuse/libefuse.a esp-idf/log/liblog.a esp-idf/main/libmain.a esp-idf/micro-ecc/libmicro-ecc.a esp-idf/soc/libsoc.a esp-idf/spi_flash/libspi_flash.a gen_project_binary
-  COMMAND = cmd.exe /C "cd /D C:\Users\jinnkay\.platformio\packages\framework-espidf\components\esptool_py && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -D IDF_PATH="C:/Users/jinnkay/.platformio/packages/framework-espidf" -D ESPTOOLPY="C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/esptool/esptool.py --chip esp32" -D ESPTOOL_ARGS="write_flash @flash_project_args" -D WORKING_DIRECTORY="G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader" -P C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/run_esptool.cmake"
+  COMMAND = cmd.exe /C "cd /D C:\Users\jinnkay\.platformio\packages\framework-espidf\components\esptool_py && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -D IDF_PATH="C:/Users/jinnkay/.platformio/packages/framework-espidf" -D ESPTOOLPY="c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/esptool/esptool.py --chip esp32" -D ESPTOOL_ARGS="write_flash @flash_project_args" -D WORKING_DIRECTORY="G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader" -P C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/run_esptool.cmake"
   pool = console
 
 
@@ -239,7 +239,7 @@ build CMakeFiles/monitor: CUSTOM_COMMAND
 # Custom command for CMakeFiles\app-flash
 
 build CMakeFiles/app-flash: CUSTOM_COMMAND || _project_elf_src app bootloader.elf esp-idf/bootloader_support/libbootloader_support.a esp-idf/efuse/libefuse.a esp-idf/log/liblog.a esp-idf/main/libmain.a esp-idf/micro-ecc/libmicro-ecc.a esp-idf/soc/libsoc.a esp-idf/spi_flash/libspi_flash.a gen_project_binary
-  COMMAND = cmd.exe /C "cd /D C:\Users\jinnkay\.platformio\packages\framework-espidf\components\esptool_py && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -D IDF_PATH="C:/Users/jinnkay/.platformio/packages/framework-espidf" -D ESPTOOLPY="C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/esptool/esptool.py --chip esp32" -D ESPTOOL_ARGS="write_flash @flash_app_args" -D WORKING_DIRECTORY="G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader" -P C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/run_esptool.cmake"
+  COMMAND = cmd.exe /C "cd /D C:\Users\jinnkay\.platformio\packages\framework-espidf\components\esptool_py && C:\Users\jinnkay\.platformio\packages\tool-cmake\bin\cmake.exe -D IDF_PATH="C:/Users/jinnkay/.platformio/packages/framework-espidf" -D ESPTOOLPY="c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/esptool/esptool.py --chip esp32" -D ESPTOOL_ARGS="write_flash @flash_app_args" -D WORKING_DIRECTORY="G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader" -P C:/Users/jinnkay/.platformio/packages/framework-espidf/components/esptool_py/run_esptool.cmake"
   pool = console
 
 
@@ -276,21 +276,21 @@ build project_elf_src.c: CUSTOM_COMMAND
 # Custom command for CMakeFiles\size
 
 build CMakeFiles/size: CUSTOM_COMMAND bootloader.elf || _project_elf_src bootloader.elf esp-idf/bootloader_support/libbootloader_support.a esp-idf/efuse/libefuse.a esp-idf/log/liblog.a esp-idf/main/libmain.a esp-idf/micro-ecc/libmicro-ecc.a esp-idf/soc/libsoc.a esp-idf/spi_flash/libspi_flash.a
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/idf_size.py G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.map"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/idf_size.py G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.map"
 
 
 #############################################
 # Custom command for CMakeFiles\size-files
 
 build CMakeFiles/size-files: CUSTOM_COMMAND bootloader.elf || _project_elf_src bootloader.elf esp-idf/bootloader_support/libbootloader_support.a esp-idf/efuse/libefuse.a esp-idf/log/liblog.a esp-idf/main/libmain.a esp-idf/micro-ecc/libmicro-ecc.a esp-idf/soc/libsoc.a esp-idf/spi_flash/libspi_flash.a
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/idf_size.py --files G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.map"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/idf_size.py --files G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.map"
 
 
 #############################################
 # Custom command for CMakeFiles\size-components
 
 build CMakeFiles/size-components: CUSTOM_COMMAND bootloader.elf || _project_elf_src bootloader.elf esp-idf/bootloader_support/libbootloader_support.a esp-idf/efuse/libefuse.a esp-idf/log/liblog.a esp-idf/main/libmain.a esp-idf/micro-ecc/libmicro-ecc.a esp-idf/soc/libsoc.a esp-idf/spi_flash/libspi_flash.a
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/idf_size.py --archives G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.map"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/tools/idf_size.py --archives G:/ESP32_LTE_MQTT/.pio/build/esp32dev/bootloader/bootloader.map"
 
 # =============================================================================
 # Write statements declared in CMakeLists.txt:
@@ -1375,21 +1375,21 @@ build esp-idf/efuse/edit_cache: phony esp-idf/efuse/CMakeFiles/edit_cache.util
 # Custom command for esp-idf\efuse\CMakeFiles\efuse_test_table
 
 build esp-idf/efuse/CMakeFiles/efuse_test_table: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader\esp-idf\efuse && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/efuse_table_gen.py C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/test/esp_efuse_test_table.csv -t esp32 --max_blk_len 192"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader\esp-idf\efuse && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/efuse_table_gen.py C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/test/esp_efuse_test_table.csv -t esp32 --max_blk_len 192"
 
 
 #############################################
 # Custom command for esp-idf\efuse\CMakeFiles\efuse_common_table
 
 build esp-idf/efuse/CMakeFiles/efuse_common_table: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader\esp-idf\efuse && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/efuse_table_gen.py C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/esp32/esp_efuse_table.csv -t esp32 --max_blk_len 192"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader\esp-idf\efuse && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/efuse_table_gen.py C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/esp32/esp_efuse_table.csv -t esp32 --max_blk_len 192"
 
 
 #############################################
 # Custom command for esp-idf\efuse\CMakeFiles\show_efuse_table
 
 build esp-idf/efuse/CMakeFiles/show_efuse_table: CUSTOM_COMMAND
-  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader\esp-idf\efuse && C:\Users\jinnkay\.platformio\penv\Scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/efuse_table_gen.py C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/esp32/esp_efuse_table.csv -t esp32 --max_blk_len 192 --info"
+  COMMAND = cmd.exe /C "cd /D G:\ESP32_LTE_MQTT\.pio\build\esp32dev\bootloader\esp-idf\efuse && c:\users\jinnkay\.platformio\penv\scripts\python.exe C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/efuse_table_gen.py C:/Users/jinnkay/.platformio/packages/framework-espidf/components/efuse/esp32/esp_efuse_table.csv -t esp32 --max_blk_len 192 --info"
 
 # =============================================================================
 # Write statements declared in CMakeLists.txt:

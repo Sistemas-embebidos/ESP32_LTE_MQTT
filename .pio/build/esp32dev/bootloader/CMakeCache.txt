@@ -242,13 +242,13 @@ IDF_TARGET:STRING=esp32
 LEGACY_INCLUDE_COMMON_HEADERS:UNINITIALIZED=
 
 //No help, variable specified on the command line.
-PYTHON:UNINITIALIZED=C:\Users\jinnkay\.platformio\penv\Scripts\python.exe
+PYTHON:UNINITIALIZED=c:\users\jinnkay\.platformio\penv\scripts\python.exe
 
 //No help, variable specified on the command line.
 PYTHON_DEPS_CHECKED:UNINITIALIZED=1
 
 //No help, variable specified on the command line.
-SDKCONFIG:UNINITIALIZED=g:\ESP32_LTE_MQTT\sdkconfig
+SDKCONFIG:UNINITIALIZED=G:\ESP32_LTE_MQTT\sdkconfig
 
 //Dependencies for the target
 __idf_bootloader_support_LIB_DEPENDS:STATIC=general;__idf_log;

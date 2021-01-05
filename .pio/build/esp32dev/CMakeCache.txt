@@ -236,7 +236,7 @@ ENABLE_TESTING:BOOL=
 ENABLE_ZLIB_SUPPORT:BOOL=OFF
 
 //No help, variable specified on the command line.
-EXTRA_COMPONENT_DIRS:PATH=g:/ESP32_LTE_MQTT/.pio/build/esp32dev/__pio_env;g:/ESP32_LTE_MQTT/src
+EXTRA_COMPONENT_DIRS:PATH=G:/ESP32_LTE_MQTT/.pio/build/esp32dev/__pio_env;G:/ESP32_LTE_MQTT/src
 
 //Git command line client
 GIT_EXECUTABLE:FILEPATH=C:/Program Files/Git/cmd/git.exe
@@ -254,7 +254,7 @@ LINK_WITH_PTHREAD:BOOL=OFF
 PERL_EXECUTABLE:FILEPATH=PERL_EXECUTABLE-NOTFOUND
 
 //No help, variable specified on the command line.
-PYTHON:UNINITIALIZED=C:\Users\jinnkay\.platformio\penv\Scripts\python.exe
+PYTHON:UNINITIALIZED=c:\users\jinnkay\.platformio\penv\scripts\python.exe
 
 //Path to a program.
 PYTHON_EXECUTABLE:FILEPATH=C:/Users/jinnkay/.platformio/penv/Scripts/python.exe
