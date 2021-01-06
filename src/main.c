@@ -12,7 +12,7 @@
 #define STRING_LENGTH_SMALL 30
 #define STRING_LENGTH_BIG 50
 
-#define MAX_BUFFER_RING 100
+#define MAX_BUFFER_RING 200
 
 char configuration[STRING_LENGTH_SMALL];
 int threshold = THRESHOLD_DEFAULT;
@@ -22,8 +22,8 @@ int rate = RATE_DEFAULT;
 bool energia = false;
 
 #define ONE_SEC 1000 / portTICK_PERIOD_MS
-#define LED_RATE 0.5 * ONE_SEC
-#define ADC_RATE rate * ONE_SEC
+#define LED_RATE 0.25 * ONE_SEC
+#define ADC_RATE 0.5 * ONE_SEC
 #define MQTT_RATE  rate * ONE_SEC
 #define CONFIG_RATE 1 * ONE_SEC
 #define N_QUEUE 2*MAX_BUFFER_RING
@@ -113,6 +113,8 @@ typedef enum
 } dc_state_t;
 
 dc_state_t dc_state = DC_DISCONNECTED;
+
+data_t datas;
 
 static void modem_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
@@ -359,14 +361,14 @@ esp_err_t save_read_data(data_t datas)
     err = nvs_set_i32(my_handle, "saved_counter", data_saved_counter);
     if (err != ESP_OK) return err;
 
-    char prueba[STRING_LENGTH_BIG];
-    char idx[10];
+    char aux[STRING_LENGTH_BIG];
+    char idx[7];
 
-    sprintf(idx,"idx_%d",data_saved_counter % MAX_BUFFER_RING);
-    sprintf(prueba,DATA_FORMAT,datas.timestamp,datas.temperature_1,datas.temperature_2,datas.temperature_3,3.3*(float)(datas.battery)/0xFFF);
-    ESP_LOGI(NVS_TAG,"Saving <%s> %s",idx,prueba);
+    sprintf(idx,"i_%d",data_saved_counter % MAX_BUFFER_RING);
+    sprintf(aux,DATA_FORMAT,datas.timestamp,datas.temperature_1,datas.temperature_2,datas.temperature_3,3.3*(float)(datas.battery)/0xFFF);
+    ESP_LOGI(NVS_TAG,"Saving <%s> %s",idx,aux);
 
-    nvs_set_str(my_handle,idx,prueba);
+    nvs_set_str(my_handle,idx,aux);
 
     // Commit written value.
     err = nvs_commit(my_handle);
@@ -444,9 +446,6 @@ static void task_led(void *arg)
 
 static void task_adc_read(void *arg)
 {
-    data_t datas;
-    datas.temperature_alert = false;
-
     char data[STRING_LENGTH_BIG];
 
     while(1) {  
@@ -456,13 +455,13 @@ static void task_adc_read(void *arg)
         datas.temperature_3 = esp_random()/100000000;
         datas.battery = adc1_get_raw(ADC1_CHANNEL_6);
 
-        printf("%f || %d\n",3.3*(float)(datas.battery)/0xFFF,rate);
+        //printf("%f || %d\n",3.3*(float)(datas.battery)/0xFFF,rate);
 
         if ( datas.temperature_1 < threshold && datas.temperature_2 < threshold && datas.temperature_3 < threshold )
         {
             if ( datas.temperature_alert )
             {
-                ESP_LOGI(MQTT_TAG, "Normal Temperature" );
+                ESP_LOGI(ADC_TAG, "Normal Temperature" );
                 sprintf(data,STATE_FORMAT,esp_log_timestamp(),NORMAL_TEMPERATURE);
                 esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                 datas.temperature_alert = false;
@@ -472,7 +471,7 @@ static void task_adc_read(void *arg)
         {
             if (! datas.temperature_alert )
             {
-                ESP_LOGI(MQTT_TAG, "High Temperature" );
+                ESP_LOGI(ADC_TAG, "High Temperature" );
                 sprintf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
                 esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                 datas.temperature_alert = true;
@@ -495,7 +494,7 @@ static void task_adc_read(void *arg)
                     sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_CONNECTED_MSG);
                     esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                     dc_state = DC_CONNECTED;
-                    ESP_LOGI(SYSTEM_TAG,DC_CONNECTED_MSG);
+                    ESP_LOGI(ADC_TAG,DC_CONNECTED_MSG);
                 }
                 break;
             }
@@ -513,15 +512,22 @@ static void task_adc_read(void *arg)
                     sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_DISCONNECTED_MSG);
                     esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                     dc_state = DC_DISCONNECTED;
-                    ESP_LOGI(SYSTEM_TAG,DC_DISCONNECTED_MSG);
+                    ESP_LOGI(ADC_TAG,DC_DISCONNECTED_MSG);
                 }
                 break;
             }
             default:
                 dc_state = DC_CONNECTED;
         }
+        vTaskDelay(ADC_RATE);
+    } 
+}
 
-        ESP_LOGI(ADC_TAG, "Saving data...");
+static void task_nvs(void *arg)
+{
+    while(1) {  
+
+        ESP_LOGI(NVS_TAG, "Saving data...");
         
         printf("%u\n",xTaskGetTickCount());
         save_read_data(datas);
@@ -587,7 +593,7 @@ static void task_connector(void* arg)
     esp_err_t err;
 
     uint32_t size_L = 0;
-    char idx[10];
+    char idx[7];
     char aux[STRING_LENGTH_BIG];
     int i;
 
@@ -626,7 +632,7 @@ static void task_connector(void* arg)
         } else {
             for (i = data_sent_counter; i <= data_saved_counter; i++) {
                 
-                sprintf(idx,"idx_%d",data_sent_counter % MAX_BUFFER_RING );
+                sprintf(idx,"i_%d",data_sent_counter % MAX_BUFFER_RING );
                 ESP_LOGI(NVS_TAG,"%d (%d) de %d en %s",data_sent_counter, data_sent_counter % MAX_BUFFER_RING, data_saved_counter,idx);
             
                 nvs_get_str(my_handle, idx, NULL, &size_L);
@@ -673,7 +679,7 @@ static void task_mqtt(void *arg)
             free(read_value);
         }
                 
-        vTaskDelay(rate * ONE_SEC);
+        vTaskDelay(0.5 * RATE_MIN * ONE_SEC);
     } 
 }
 
@@ -681,6 +687,8 @@ void start_system(void)
 {
     printf("#################################################################\n");
     
+    datas.temperature_alert = false;
+
     // Print chip information 
     esp_chip_info_t chip_info;
     esp_chip_info(&chip_info);
@@ -737,6 +745,7 @@ void app_main(void)
     xTaskCreate(task_mqtt, "task_mqtt", 2048, NULL, 5, NULL);
     xTaskCreate(task_config, "task_config", 2048, NULL, 5, NULL);
     xTaskCreate(task_adc_read, "task_adc_read", 2048, NULL, 5, NULL);
+    xTaskCreate(task_nvs, "task_nvs", 2048, NULL, 5, NULL);
     xTaskCreate(task_connector, "task_connector", 2048, NULL, 5, NULL);
 }
 
