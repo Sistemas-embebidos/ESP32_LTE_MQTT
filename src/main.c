@@ -6,13 +6,13 @@
 #define ESP_MAXIMUM_RETRY  5
 
 #define THRESHOLD_DEFAULT 50
-#define RATE_DEFAULT 10
+#define RATE_DEFAULT 60
 #define RATE_MIN 10
 #define TEMP_MIN 0
 #define STRING_LENGTH_SMALL 30
 #define STRING_LENGTH_BIG 50
 
-#define MAX_BUFFER_RING 10
+#define MAX_BUFFER_RING 100
 
 char configuration[STRING_LENGTH_SMALL];
 int threshold = THRESHOLD_DEFAULT;
@@ -196,7 +196,7 @@ esp_err_t esp32_wifi_eventHandler(void *ctx, system_event_t *event) {
 
 static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
 {
-    esp_mqtt_client_handle_t client = event->client;
+    client = event->client;
     int msg_id;
     switch (event->event_id) {
         case MQTT_EVENT_CONNECTED:
@@ -456,7 +456,7 @@ static void task_adc_read(void *arg)
         datas.temperature_3 = esp_random()/100000000;
         datas.battery = adc1_get_raw(ADC1_CHANNEL_6);
 
-        //printf("%f || %d\n",3.3*(float)(datas.battery)/0xFFF,threshold);
+        printf("%f || %d\n",3.3*(float)(datas.battery)/0xFFF,rate);
 
         if ( datas.temperature_1 < threshold && datas.temperature_2 < threshold && datas.temperature_3 < threshold )
         {
@@ -522,7 +522,11 @@ static void task_adc_read(void *arg)
         }
 
         ESP_LOGI(ADC_TAG, "Saving data...");
+        
+        printf("%u\n",xTaskGetTickCount());
         save_read_data(datas);
+        printf("%u\n",xTaskGetTickCount());
+
         vTaskDelay(rate * ONE_SEC);
     } 
 }
@@ -585,7 +589,7 @@ static void task_connector(void* arg)
     uint32_t size_L = 0;
     char idx[10];
     char aux[STRING_LENGTH_BIG];
-    int i = 0;
+    int i;
 
     while(1)
     {
@@ -642,7 +646,6 @@ static void task_connector(void* arg)
                 }
             }
         }
-
         // Close
         nvs_close(my_handle);
 
@@ -731,9 +734,9 @@ void app_main(void)
     }
 
     xTaskCreate(task_led, "task_led", 2048, NULL, 5, NULL);
-    xTaskCreate(task_adc_read, "task_adc_read", 2048, NULL, 5, NULL);
     xTaskCreate(task_mqtt, "task_mqtt", 2048, NULL, 5, NULL);
     xTaskCreate(task_config, "task_config", 2048, NULL, 5, NULL);
+    xTaskCreate(task_adc_read, "task_adc_read", 2048, NULL, 5, NULL);
     xTaskCreate(task_connector, "task_connector", 2048, NULL, 5, NULL);
 }
 
