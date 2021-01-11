@@ -5,17 +5,20 @@
 #define ESP_WIFI_PASS      "pruebaTBA"
 #define ESP_MAXIMUM_RETRY  5
 
-#define THRESHOLD_DEFAULT 50
+#define THRESHOLD_MIN_DEFAULT 0
+#define THRESHOLD_MAX_DEFAULT 50
 #define RATE_DEFAULT 60
 #define RATE_MIN 10
-#define TEMP_MIN 0
+#define TEMP_MIN -20
+#define TEMP_MAX 70
 #define STRING_LENGTH_SMALL 30
 #define STRING_LENGTH_BIG 50
 
 #define MAX_BUFFER_RING 200
 
 char configuration[STRING_LENGTH_SMALL];
-int threshold = THRESHOLD_DEFAULT;
+int threshold_min = THRESHOLD_MIN_DEFAULT;
+int threshold_max = THRESHOLD_MAX_DEFAULT;
 int rate = RATE_DEFAULT;
 
 //uint32_t data_saved_counter = 0, data_sent_counter = 0;
@@ -57,6 +60,7 @@ QueueHandle_t Queue_data,Queue_config;
 #define DC_DISCONNECTED_MSG "BATTERY_ONLY"
 #define DC_CONNECTED_MSG "DC_CONNECTED"
 #define HIGH_TEMPERATURE "HIGH_TEMP"
+#define LOW_TEMPERATURE "LOW_TEMP"
 #define NORMAL_TEMPERATURE "NORMAL_TEMP"
 
 #define LTE_TAG "[LTE]"
@@ -388,11 +392,17 @@ esp_err_t load_config(void)
     err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
     if (err != ESP_OK) return err;
 
-    // Read threshold
-    //int32_t threshold = 0; // value will default to 0, if not set yet in NVS
-    err = nvs_get_i32(my_handle, "threshold", &threshold);
+    // Read threshold_min
+    //int32_t threshold_min = 0; // value will default to 0, if not set yet in NVS
+    err = nvs_get_i32(my_handle, "threshold_min", &threshold_min);
     if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("threshold = %d\n", threshold);
+    printf("threshold_min = %d\n", threshold_min);
+
+    // Read threshold_max
+    //int32_t threshold_max = 0; // value will default to 0, if not set yet in NVS
+    err = nvs_get_i32(my_handle, "threshold_max", &threshold_max);
+    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
+    printf("threshold_max = %d\n", threshold_max);
 
     // Read rate
     //int32_t rate = 0; // value will default to 0, if not set yet in NVS
@@ -415,7 +425,11 @@ esp_err_t save_config(void)
     if (err != ESP_OK) return err;
 
     // Write
-    err = nvs_set_i32(my_handle, "threshold", threshold);
+    err = nvs_set_i32(my_handle, "threshold_min", threshold_min);
+    if (err != ESP_OK) return err;
+
+    // Write
+    err = nvs_set_i32(my_handle, "threshold_max", threshold_max);
     if (err != ESP_OK) return err;
 
     // Write
@@ -429,6 +443,42 @@ esp_err_t save_config(void)
     // Close
     nvs_close(my_handle);
     return ESP_OK;
+}
+
+int parserJsonIntValues( char const* json, int* parsedValues )
+{
+    bool saveNextChar = false;
+    char stringValue[10];
+    int stringValueIndex = 0;
+    int i = 0;
+    int numberOfParsedValues = 0;
+
+    while( json[i] != '\0' ) {
+        //printf( "i: %d\r\n", i );
+        if( json[i] == ':' ) {
+            saveNextChar = true;
+            i++;
+            continue;
+        }
+        if( json[i] == ',' || json[i] == '}' ) {
+            stringValue[stringValueIndex] = '\0';
+            parsedValues[numberOfParsedValues] = atoi(stringValue); // ASCII to Integer
+            numberOfParsedValues++;
+            stringValueIndex = 0;
+            saveNextChar = false;
+            if( json[i] == '}' ) {
+                return numberOfParsedValues;
+            }
+            i++;
+            continue;
+        }
+        if( saveNextChar ) {
+            stringValue[stringValueIndex] = json[i];
+            stringValueIndex++;
+        }
+        i++;
+    }
+    return numberOfParsedValues;
 }
 
 static void task_led(void *arg)
@@ -457,7 +507,8 @@ static void task_adc_read(void *arg)
 
         //printf("%f || %d\n",3.3*(float)(datas.battery)/0xFFF,rate);
 
-        if ( datas.temperature_1 < threshold && datas.temperature_2 < threshold && datas.temperature_3 < threshold )
+        if ( datas.temperature_1 <= threshold_max && datas.temperature_2 <= threshold_max && datas.temperature_3 <= threshold_max &&
+             datas.temperature_1 >= threshold_min && datas.temperature_2 >= threshold_min && datas.temperature_3 <= threshold_max)
         {
             if ( datas.temperature_alert )
             {
@@ -471,10 +522,24 @@ static void task_adc_read(void *arg)
         {
             if (! datas.temperature_alert )
             {
-                ESP_LOGI(ADC_TAG, "High Temperature" );
-                sprintf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
-                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
-                datas.temperature_alert = true;
+                if ( datas.temperature_1 > threshold_max || datas.temperature_2 > threshold_max || datas.temperature_3 > threshold_max)
+                {
+                    ESP_LOGI(ADC_TAG, "High Temperature" );
+                    printf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
+                    esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    datas.temperature_alert = true;
+                }
+
+                if ( datas.temperature_1 < threshold_min || datas.temperature_2 < threshold_min || datas.temperature_3 < threshold_min)
+                {
+                    ESP_LOGI(ADC_TAG, "Low Temperature" );
+                    printf(data,STATE_FORMAT,esp_log_timestamp(),LOW_TEMPERATURE);
+                    esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    datas.temperature_alert = true;
+                }
+
+
+                
             }
         }  
 
@@ -529,9 +594,9 @@ static void task_nvs(void *arg)
 
         ESP_LOGI(NVS_TAG, "Saving data...");
         
-        printf("%u\n",xTaskGetTickCount());
+        //printf("%u\n",xTaskGetTickCount());
         save_read_data(datas);
-        printf("%u\n",xTaskGetTickCount());
+        //printf("%u\n",xTaskGetTickCount());
 
         vTaskDelay(rate * ONE_SEC);
     } 
@@ -544,43 +609,39 @@ static void task_config(void *arg)
     while(1) {   
         xQueueReceive( Queue_config, &config, portMAX_DELAY);
 
-        char *ptr_1,*ptr_2;
-        char *pt_threshold;
-        char *pt_rate;
+        int parsedValues[10];
+        int numberOfParsedValues = 0;
 
-        int aux;
+        //printf( "String to parse: %s\r\n\r\n", config );
 
-        ptr_1 = strtok (config,",");
-        ptr_2 = strtok (NULL,",");
-        
-        //printf("%s | %s\n",ptr_1,ptr_2);
-    
-        pt_threshold = strtok (ptr_1,":");
-        pt_threshold = strtok (NULL,":");
+        // Parsear tl, th y rt
+        numberOfParsedValues = parserJsonIntValues( config, parsedValues );
 
-        pt_rate = strtok (ptr_2,":");
-        pt_rate = strtok (NULL,":");
+        //printf( "Number of parsed values: %d\r\n\r\n", numberOfParsedValues );
 
-        pt_rate[strlen(pt_rate)-1] = '\0';
+        //int i = 0;
+        //for( i=0; i<numberOfParsedValues; i++ ) {
+        //    printf( "Parsed value %d: %d\r\n", i, parsedValues[i] );
+        //}
 
-        //printf("%s | %s\n",pt_threshold,pt_rate);
-    
-        // Usar ATOI para tener el int
-        aux = atoi(pt_threshold);
-
-        if (aux >= TEMP_MIN)
+        if (parsedValues[0] >= TEMP_MIN)
         {
-            threshold = aux;
-            ESP_LOGI(SYSTEM_TAG,"Temperature threshold: %d °C",threshold);
+            threshold_min = parsedValues[0];
+            ESP_LOGI(SYSTEM_TAG,"Temperature threshold_min: %d °C",threshold_min);
         }
 
-        aux = atoi(pt_rate);
-
-        if (aux >= RATE_MIN)
+        if (parsedValues[1] <= TEMP_MAX)
         {
-            rate = aux;
+            threshold_max = parsedValues[1];
+            ESP_LOGI(SYSTEM_TAG,"Temperature threshold_max: %d °C",threshold_max);
+        }
+
+        if (parsedValues[2] >= RATE_MIN)
+        {
+            rate = parsedValues[2];
             ESP_LOGI(SYSTEM_TAG,"MQTT rate: %d seconds",rate);
         }
+
         save_config();
 
         vTaskDelay(CONFIG_RATE);
@@ -722,7 +783,8 @@ void app_main(void)
     if (ret != ESP_OK) 
     {
         printf("Error (%s) loading config from NVS!\n", esp_err_to_name(ret));
-        threshold = THRESHOLD_DEFAULT;
+        threshold_min = THRESHOLD_MIN_DEFAULT;
+        threshold_max = THRESHOLD_MAX_DEFAULT;
         rate = RATE_DEFAULT;
     }
 
