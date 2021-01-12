@@ -102,6 +102,7 @@ if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   include("G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/ulp/cmake_install.cmake")
   include("G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/unity/cmake_install.cmake")
   include("G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/wifi_provisioning/cmake_install.cmake")
+  include("G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/modem/cmake_install.cmake")
   include("G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/__pio_env/cmake_install.cmake")
   include("G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/src/cmake_install.cmake")
 

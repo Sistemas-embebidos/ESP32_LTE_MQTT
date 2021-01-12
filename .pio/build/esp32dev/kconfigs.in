@@ -39,3 +39,4 @@ source "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/vfs/Kc
 source "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/wear_levelling/Kconfig"
 source "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/wifi_provisioning/Kconfig"
 source "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/wpa_supplicant/Kconfig"
+source "G:/ESP32_LTE_MQTT/components/modem/Kconfig"

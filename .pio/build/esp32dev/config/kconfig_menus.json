@@ -14328,6 +14328,34 @@
                 "id": "component-config-supplicant",
                 "title": "Supplicant",
                 "type": "menu"
+            },
+            {
+                "children": [
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "Logical name which is used to select the GGSN or the external packet data network.",
+                        "id": "COMPONENT_MODEM_APN",
+                        "name": "COMPONENT_MODEM_APN",
+                        "range": null,
+                        "title": "Set Access Point Name (APN)",
+                        "type": "string"
+                    },
+                    {
+                        "children": [],
+                        "depends_on": null,
+                        "help": "PIN which is used to unlock the SIM card.",
+                        "id": "COMPONENT_MODEM_PIN",
+                        "name": "COMPONENT_MODEM_PIN",
+                        "range": null,
+                        "title": "Set Personal identification number (PIN)",
+                        "type": "string"
+                    }
+                ],
+                "depends_on": null,
+                "id": "component-config-esp-lte-modem",
+                "title": "ESP-LTE-MODEM",
+                "type": "menu"
             }
         ],
         "depends_on": null,

@@ -58,3 +58,4 @@ G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/spiffs/libspiffs.a
 G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/ulp/libulp.a
 G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/unity/libunity.a
 G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/wifi_provisioning/libwifi_provisioning.a
+G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/modem/libmodem.a

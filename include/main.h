@@ -41,3 +41,6 @@
 #include "mqtt_client.h"
 
 #include "tasks.h"
+#include "modem.h"
+
+#define LTE_READY true

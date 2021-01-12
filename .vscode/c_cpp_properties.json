@@ -97,6 +97,7 @@
                 "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/unity/include",
                 "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/unity/unity/src",
                 "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
+                "G:/ESP32_LTE_MQTT/components/modem/include",
                 "g:/ESP32_LTE_MQTT/.pio/libdeps/esp32dev/ESPAsync_WiFiManager/src",
                 "C:/Users/jinnkay/.platformio/packages/tool-unity",
                 ""
@@ -193,6 +194,7 @@
                     "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/unity/include",
                     "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/unity/unity/src",
                     "C:/Users/jinnkay/.platformio/packages/framework-espidf/components/wifi_provisioning/include",
+                    "G:/ESP32_LTE_MQTT/components/modem/include",
                     "g:/ESP32_LTE_MQTT/.pio/libdeps/esp32dev/ESPAsync_WiFiManager/src",
                     "C:/Users/jinnkay/.platformio/packages/tool-unity",
                     ""
