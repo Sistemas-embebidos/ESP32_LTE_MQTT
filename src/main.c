@@ -39,7 +39,6 @@ static EventGroupHandle_t wifi_event_group; /* FreeRTOS event group to signal wh
 
 static EventGroupHandle_t event_group; /* FreeRTOS event group to signal when we are connected*/
 
-
 QueueHandle_t Queue_data,Queue_config;
 
 /* The event group allows multiple bits for each event, but we only care about two events:
@@ -376,8 +375,8 @@ void lte_start()
     // setup UART specific configuration based on kconfig options 
     config.tx_io_num = MODEM_UART_TX_PIN;
     config.rx_io_num = MODEM_UART_RX_PIN;
-    config.rts_io_num = MODEM_UART_RTS_PIN;
-    config.cts_io_num = MODEM_UART_CTS_PIN;
+    //config.rts_io_num = MODEM_UART_RTS_PIN;
+    //config.cts_io_num = MODEM_UART_CTS_PIN;
     config.rx_buffer_size = MODEM_UART_RX_BUFFER_SIZE;
     config.tx_buffer_size = MODEM_UART_TX_BUFFER_SIZE;
     config.pattern_queue_size = MODEM_UART_PATTERN_QUEUE_SIZE;
@@ -407,7 +406,7 @@ void lte_start()
     do {
         ESP_LOGI(LTE_TAG, "Trying to initialize modem on GPIO TX: %d / RX: %d", config.tx_io_num, config.rx_io_num);
         
-        dce = bg96_init(dte);
+        dce = sim800_init(dte);
 
         /* create dce object */
         #if CONFIG_EXAMPLE_MODEM_DEVICE_SIM800
@@ -417,7 +416,7 @@ void lte_start()
         #elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM7600
             dce = sim7600_init(dte);
         #endif
-        vTaskDelay(LTE_RATE);
+        vTaskDelay(LTE_RATE / 10);
     } while (dce == NULL);
     
     assert(dce != NULL);
@@ -625,8 +624,6 @@ static void task_led(void *arg)
 
 static void task_lte(void *arg)
 {  
-    
-
     while(1) {          
         /* Get signal quality again */
         ESP_LOGI(LTE_TAG,"PROBANDO");

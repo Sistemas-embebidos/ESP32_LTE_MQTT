@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"name": "ESP32_LTE_MQTT",
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"sstream": "c",
+			"array": "c",
+			"string": "c",
+			"string_view": "c"
+		}
+	}
+}

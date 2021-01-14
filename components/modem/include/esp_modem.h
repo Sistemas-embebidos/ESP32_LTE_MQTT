@@ -76,16 +76,16 @@ typedef esp_err_t (*esp_modem_on_receive)(void *buffer, size_t len, void *contex
  */
 #define ESP_MODEM_DTE_DEFAULT_CONFIG()          \
     {                                           \
-        .port_num = UART_NUM_1,                 \
+        .port_num = UART_NUM_2,                 \
         .data_bits = UART_DATA_8_BITS,          \
         .stop_bits = UART_STOP_BITS_1,          \
         .parity = UART_PARITY_DISABLE,          \
         .baud_rate = 115200,                    \
         .flow_control = MODEM_FLOW_CONTROL_NONE,\
-        .tx_io_num = 25,                        \
-        .rx_io_num = 26,                        \
-        .rts_io_num = 27,                       \
-        .cts_io_num = 23,                       \
+        .tx_io_num = 17,                        \
+        .rx_io_num = 16,                        \
+        .rts_io_num = 7,                       \
+        .cts_io_num = 8,                       \
         .rx_buffer_size = 1024,                 \
         .tx_buffer_size = 512,                  \
         .pattern_queue_size = 20,               \

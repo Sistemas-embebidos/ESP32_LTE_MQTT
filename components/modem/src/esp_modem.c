@@ -412,6 +412,7 @@ static esp_err_t esp_modem_dte_send_cmd(modem_dte_t *dte, const char *command, u
     /* Reset runtime information */
     dce->state = MODEM_STATE_PROCESSING;
     /* Send command via UART */
+    printf("puerto %d | %s\n",esp_dte->uart_port,command);
     uart_write_bytes(esp_dte->uart_port, command, strlen(command));
     /* Check timeout */
     MODEM_CHECK(xSemaphoreTake(esp_dte->process_sem, pdMS_TO_TICKS(timeout)) == pdTRUE, "process command timeout", err);
