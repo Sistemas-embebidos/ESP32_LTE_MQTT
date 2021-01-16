@@ -406,7 +406,7 @@ void lte_start()
     do {
         ESP_LOGI(LTE_TAG, "Trying to initialize modem on GPIO TX: %d / RX: %d", config.tx_io_num, config.rx_io_num);
         
-        dce = sim800_init(dte);
+        dce = bg96_init(dte);
 
         /* create dce object */
         #if CONFIG_EXAMPLE_MODEM_DEVICE_SIM800
@@ -425,8 +425,8 @@ void lte_start()
     /* Enable CMUX */
     esp_modem_start_cmux(dte);
 
-    ESP_ERROR_CHECK(dce->set_flow_ctrl(dce, MODEM_FLOW_CONTROL_NONE));
-    ESP_ERROR_CHECK(dce->store_profile(dce));
+    //ESP_ERROR_CHECK(dce->set_flow_ctrl(dce, MODEM_FLOW_CONTROL_NONE));        // Aca el arduino falla
+    //ESP_ERROR_CHECK(dce->store_profile(dce));                                 // Aca el arduino falla
     ESP_LOGI(LTE_TAG,"Printing information");
     /* Print Module ID, Operator, IMEI, IMSI */
     ESP_LOGI(LTE_TAG, "Module: %s", dce->name);
@@ -436,20 +436,22 @@ void lte_start()
     ESP_LOGI(LTE_TAG,"Getting signal quality");
     /* Get signal quality */
     uint32_t rssi = 0, ber = 0;
-    ESP_ERROR_CHECK(dce->get_signal_quality(dce, &rssi, &ber));
+    //ESP_ERROR_CHECK(dce->get_signal_quality(dce, &rssi, &ber));           // Aca el arduino falla
     ESP_LOGI(LTE_TAG, "rssi: %d, ber: %d", rssi, ber);
     ESP_LOGI(LTE_TAG,"Getting battery voltage");
     /* Get battery voltage */
     uint32_t voltage = 0, bcs = 0, bcl = 0;
-    ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));
+    //ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));  // Aca el arduino falla
     ESP_LOGI(LTE_TAG, "Battery voltage: %d mV", voltage);
     ESP_LOGI(LTE_TAG,"Configurating PPPos network");
     /* setup PPPoS network parameters */
     #if !defined(CONFIG_EXAMPLE_MODEM_PPP_AUTH_NONE) && (defined(CONFIG_LWIP_PPP_PAP_SUPPORT) || defined(CONFIG_LWIP_PPP_CHAP_SUPPORT))
         esp_netif_ppp_set_auth(esp_netif, auth_type, MODEM_PPP_AUTH_USERNAME, MODEM_PPP_AUTH_PASSWORD);
     #endif
+    ESP_LOGI(LTE_TAG,"Attach the modem to the network interface");
     /* attach the modem to the network interface */
-    esp_netif_attach(esp_netif, modem_netif_adapter);
+    esp_netif_attach(esp_netif, modem_netif_adapter);   // Aca el arduino falla
+    ESP_LOGI(LTE_TAG,"Waiting IP address");
     /* Wait for IP address */
     xEventGroupWaitBits(event_group, CONNECT_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
 

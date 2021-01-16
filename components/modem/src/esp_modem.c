@@ -135,6 +135,7 @@ static esp_err_t esp_dte_handle_line(esp_modem_dte_t *esp_dte)
     /* Skip pure "\r\n" lines */
     if (len > 2 && !is_only_cr_lf(line, len)) {
         MODEM_CHECK(dce->handle_line, "no handler for line", err_handle);
+        printf("[MODEM]:%s",line);
         MODEM_CHECK(dce->handle_line(dce, line) == ESP_OK, "handle line failed", err_handle);
     }
     return ESP_OK;
@@ -412,7 +413,7 @@ static esp_err_t esp_modem_dte_send_cmd(modem_dte_t *dte, const char *command, u
     /* Reset runtime information */
     dce->state = MODEM_STATE_PROCESSING;
     /* Send command via UART */
-    printf("puerto %d | %s\n",esp_dte->uart_port,command);
+    printf("Comando (%d)[%d] %s\n",esp_dte->uart_port,strlen(command),command);
     uart_write_bytes(esp_dte->uart_port, command, strlen(command));
     /* Check timeout */
     MODEM_CHECK(xSemaphoreTake(esp_dte->process_sem, pdMS_TO_TICKS(timeout)) == pdTRUE, "process command timeout", err);
@@ -622,6 +623,7 @@ static esp_err_t esp_modem_dte_change_mode(modem_dte_t *dte, modem_mode_t new_mo
     MODEM_CHECK(dce, "DTE has not yet bind with DCE", err);
     esp_modem_dte_t *esp_dte = __containerof(dte, esp_modem_dte_t, parent);
     MODEM_CHECK(dce->mode != new_mode, "already in mode: %d", err, new_mode);
+    printf("Comenzando a cambiar de modo: %d\r\n",new_mode);
     switch (new_mode) {
     case MODEM_PPP_MODE:
         ESP_LOGI(MODEM_TAG, "PPP MODE");
@@ -640,8 +642,10 @@ static esp_err_t esp_modem_dte_change_mode(modem_dte_t *dte, modem_mode_t new_mo
         MODEM_CHECK(dce->set_working_mode(dce, new_mode) == ESP_OK, "set new working mode:%d failed", err, new_mode);
         uart_disable_pattern_det_intr(esp_dte->uart_port);
         uart_enable_rx_intr(esp_dte->uart_port);
-        dce->setup_cmux(dce);
-         break;
+        printf("Y\r\n"); 
+        //dce->setup_cmux(dce);
+        printf("Z\r\n");
+        break;
     default:
         break;
     }
@@ -773,7 +777,7 @@ modem_dte_t *esp_modem_dte_init(const esp_modem_dte_config_t *config)
                                  & (esp_dte->uart_event_task_hdl)   //Task Handler
                                 );
     MODEM_CHECK(ret == pdTRUE, "create uart event task failed", err_tsk_create);
-    uart_write_bytes(esp_dte->uart_port, "+++", 3);
+    uart_write_bytes(esp_dte->uart_port, "+++\r\n", 5);
     char cmd_cld[8] = {0xf9, 0x03, 0xef, 0x05, 0xc3, 0x01, 0xf2, 0xf9};
     uart_write_bytes(esp_dte->uart_port, cmd_cld, 8);
     return &(esp_dte->parent);
@@ -815,9 +819,11 @@ esp_err_t esp_modem_start_ppp(modem_dte_t *dte)
     ESP_LOGI(MODEM_TAG, "APN: %s", CONFIG_COMPONENT_MODEM_APN);
     MODEM_CHECK(dce->define_pdp_context(dce, 1, "IP", CONFIG_COMPONENT_MODEM_APN) == ESP_OK, "set MODEM APN failed", err);
     /* Enter PPP mode */
+    ESP_LOGI(MODEM_TAG, "Entering PPP mode");
     MODEM_CHECK(dte->change_mode(dte, MODEM_PPP_MODE) == ESP_OK, "enter ppp mode failed", err);
 
     /* post PPP mode started event */
+    ESP_LOGI(MODEM_TAG, "PPP start event");
     esp_event_post_to(esp_dte->event_loop_hdl, ESP_MODEM_EVENT, ESP_MODEM_EVENT_PPP_START, NULL, 0, 0);
     return ESP_OK;
 err:
@@ -831,7 +837,6 @@ esp_err_t esp_modem_start_cmux(modem_dte_t *dte)
 
     /* Enter cmux mode */
     MODEM_CHECK(dte->change_mode(dte, MODEM_CMUX_MODE) == ESP_OK, "enter command mode failed", err);
-
     return ESP_OK;
 err:
     return ESP_FAIL;

@@ -1,4 +1,4 @@
-# Install script for directory: G:/ESP32_LTE_MQTT
+# Install script for directory: C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)
@@ -34,7 +34,7 @@ endif()
 
 if(NOT CMAKE_INSTALL_LOCAL_ONLY)
   # Include the install script for the subdirectory.
-  include("G:/ESP32_LTE_MQTT/.pio/build/esp32dev/esp-idf/cmake_install.cmake")
+  include("C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/esp-idf/cmake_install.cmake")
 endif()
 
 if(CMAKE_INSTALL_COMPONENT)
@@ -45,5 +45,5 @@ endif()
 
 string(REPLACE ";" "\n" CMAKE_INSTALL_MANIFEST_CONTENT
        "${CMAKE_INSTALL_MANIFEST_FILES}")
-file(WRITE "G:/ESP32_LTE_MQTT/.pio/build/esp32dev/${CMAKE_INSTALL_MANIFEST}"
+file(WRITE "C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/${CMAKE_INSTALL_MANIFEST}"
      "${CMAKE_INSTALL_MANIFEST_CONTENT}")

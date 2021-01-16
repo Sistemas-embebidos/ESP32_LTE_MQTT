@@ -1,4 +1,4 @@
-# Install script for directory: G:/ESP32_LTE_MQTT/.pio/build/esp32dev/__pio_env
+# Install script for directory: C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/.pio/build/esp32dev/__pio_env
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

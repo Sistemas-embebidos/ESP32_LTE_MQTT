@@ -57,6 +57,7 @@ static esp_err_t esp_modem_dte_transmit(void *h, void *buffer, size_t len)
  */
 static esp_err_t esp_modem_post_attach_start(esp_netif_t * esp_netif, void * args)
 {
+    ESP_LOGI("[ATTACH]","Beginning");
     esp_modem_netif_driver_t *driver = args;
     modem_dte_t *dte = driver->dte;
     const esp_netif_driver_ifconfig_t driver_ifconfig = {
