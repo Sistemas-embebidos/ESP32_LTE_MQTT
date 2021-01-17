@@ -205,9 +205,10 @@ static esp_err_t sim800_handle_cops(modem_dce_t *dce, const char *line)
     } else if (!strncmp(line, "+COPS", strlen("+COPS"))) {
         /* there might be some random spaces in operator's name, we can not use sscanf to parse the result */
         /* strtok will break the string, we need to create a copy */
-        size_t len = strlen(line);
+        size_t len = strlen(line);    
         char *line_copy = malloc(len + 1);
         strcpy(line_copy, line);
+        printf("COPS rta:%s",line_copy);
         /* +COPS: <mode>[, <format>[, <oper>]] */
         char *str_ptr = NULL;
         char *p[3];
@@ -431,7 +432,7 @@ static esp_err_t sim800_get_operator_name(sim800_modem_dce_t *sim800_dce)
     sim800_dce->parent.handle_line = sim800_handle_cops;
     DCE_CHECK(dte->send_cmd(dte, "AT+COPS?\r", MODEM_COMMAND_TIMEOUT_OPERATOR) == ESP_OK, "send command failed", err);
     DCE_CHECK(sim800_dce->parent.state == MODEM_STATE_SUCCESS, "get network operator failed", err);
-    ESP_LOGD(DCE_TAG, "get network operator ok");
+    ESP_LOGI(DCE_TAG, "get network operator ok");
     return ESP_OK;
 err:
     return ESP_FAIL;
@@ -481,8 +482,8 @@ modem_dce_t *sim800_init(modem_dte_t *dte)
     /* Sync between DTE and DCE */
     DCE_CHECK(esp_modem_dce_sync(&(sim800_dce->parent)) == ESP_OK, "sync failed", err_io);
     /* Setup CMUX */
- //   if (sim800_dce->parent.dte->cmux)
- //     DCE_CHECK(sim800_dce->parent.dte->change_mode(sim800_dce->parent.dte, MODEM_CMUX_MODE) == ESP_OK, "CMUX failed", err_io);
+    //if (sim800_dce->parent.dte->cmux)
+    //  DCE_CHECK(sim800_dce->parent.dte->change_mode(sim800_dce->parent.dte, MODEM_CMUX_MODE) == ESP_OK, "CMUX failed", err_io);
     /* Close echo */
     DCE_CHECK(esp_modem_dce_echo(&(sim800_dce->parent), false) == ESP_OK, "close echo mode failed", err_io);
     /* Get Module name */
@@ -492,7 +493,10 @@ modem_dce_t *sim800_init(modem_dte_t *dte)
     /* Get IMSI number */
     DCE_CHECK(sim800_get_imsi_number(sim800_dce) == ESP_OK, "get imsi failed", err_io);
     /* Get operator name */
+    //while(sim800_get_operator_name(sim800_dce) != ESP_OK)
+
     DCE_CHECK(sim800_get_operator_name(sim800_dce) == ESP_OK, "get operator name failed", err_io);
+    
     return &(sim800_dce->parent);
 err_io:
     free(sim800_dce);

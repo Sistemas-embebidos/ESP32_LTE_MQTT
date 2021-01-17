@@ -1367,7 +1367,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "Test.elf::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-Test.elf-41da7596028e394af062.json",
+					"jsonFile" : "target-Test.elf-44d1e6e914cf252c4cec.json",
 					"name" : "Test.elf",
 					"projectIndex" : 0
 				},
@@ -1521,7 +1521,7 @@
 				{
 					"directoryIndex" : 54,
 					"id" : "__idf_esp_local_ctrl::@d6aad58d2946e56208ef",
-					"jsonFile" : "target-__idf_esp_local_ctrl-e03849a9a62340316cac.json",
+					"jsonFile" : "target-__idf_esp_local_ctrl-fd74d754b9adcbe06b92.json",
 					"name" : "__idf_esp_local_ctrl",
 					"projectIndex" : 1
 				},
@@ -1794,7 +1794,7 @@
 				{
 					"directoryIndex" : 72,
 					"id" : "__idf_wifi_provisioning::@9d7e7ffe1b15746c1098",
-					"jsonFile" : "target-__idf_wifi_provisioning-83311a4c2e8884a22f2e.json",
+					"jsonFile" : "target-__idf_wifi_provisioning-186c405033a885841756.json",
 					"name" : "__idf_wifi_provisioning",
 					"projectIndex" : 1
 				},
@@ -1815,7 +1815,7 @@
 				{
 					"directoryIndex" : 18,
 					"id" : "__ldgen_output_esp32.project.ld::@c361781f7cb51efad0ea",
-					"jsonFile" : "target-__ldgen_output_esp32.project.ld-b79edfc08dd7347569c6.json",
+					"jsonFile" : "target-__ldgen_output_esp32.project.ld-d6355a18032100038822.json",
 					"name" : "__ldgen_output_esp32.project.ld",
 					"projectIndex" : 1
 				},
@@ -1920,7 +1920,7 @@
 				{
 					"directoryIndex" : 0,
 					"id" : "flash::@6890427a1f51a3e7e1df",
-					"jsonFile" : "target-flash-13c98f9d918525243557.json",
+					"jsonFile" : "target-flash-e9b9374631e43d56d4c6.json",
 					"name" : "flash",
 					"projectIndex" : 0
 				},

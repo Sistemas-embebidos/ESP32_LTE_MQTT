@@ -79,14 +79,14 @@
 	"dependencies" : 
 	[
 		{
-			"backtrace" : 9,
-			"id" : "partition_table::@8e7a60ee4fe55e1aaabf"
+			"id" : "bootloader::@6890427a1f51a3e7e1df"
 		},
 		{
 			"id" : "app::@6890427a1f51a3e7e1df"
 		},
 		{
-			"id" : "bootloader::@6890427a1f51a3e7e1df"
+			"backtrace" : 9,
+			"id" : "partition_table::@8e7a60ee4fe55e1aaabf"
 		}
 	],
 	"id" : "flash::@6890427a1f51a3e7e1df",
