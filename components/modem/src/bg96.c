@@ -31,12 +31,8 @@ static const char *DCE_TAG = "bg96";
  */
 static esp_err_t bg96_handle_csq(modem_dce_t *dce, const char *line)
 {
-    printf("[RTA] %s",line);
     esp_err_t err = ESP_FAIL;
     bg96_modem_dce_t *bg96_dce = __containerof(dce, bg96_modem_dce_t, parent);
-
-    printf("[RTA] %s",line);
-
     if (strstr(line, MODEM_RESULT_CODE_SUCCESS)) {
         err = esp_modem_process_command_done(dce, MODEM_STATE_SUCCESS);
     } else if (strstr(line, MODEM_RESULT_CODE_ERROR)) {
@@ -182,7 +178,6 @@ static esp_err_t bg96_handle_cops(modem_dce_t *dce, const char *line)
         size_t len = strlen(line);
         char *line_copy = malloc(len + 1);
         strcpy(line_copy, line);
-        printf(line_copy);
         /* +COPS: <mode>[, <format>[, <oper>]] */
         char *str_ptr = NULL;
         char *p[3];
@@ -236,8 +231,7 @@ static esp_err_t bg96_get_signal_quality(modem_dce_t *dce, uint32_t *rssi, uint3
     uint32_t *resource[2] = {rssi, ber};
     bg96_dce->priv_resource = resource;
     dce->handle_line = bg96_handle_csq;
-    ESP_LOGI("[BG96]", "Sending AT+CSQ");
-    DCE_CHECK(dte->send_cmd(dte, "AT+CSQ\r\n",MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT+CSQ\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
     DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "inquire signal quality failed", err);
     ESP_LOGD(DCE_TAG, "inquire signal quality ok");
     return ESP_OK;
@@ -263,7 +257,7 @@ static esp_err_t bg96_get_battery_status(modem_dce_t *dce, uint32_t *bcs, uint32
     uint32_t *resource[3] = {bcs, bcl, voltage};
     bg96_dce->priv_resource = resource;
     dce->handle_line = bg96_handle_cbc;
-    DCE_CHECK(dte->send_cmd(dte, "AT+CBC\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT+CBC\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
     DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "inquire battery status failed", err);
     ESP_LOGD(DCE_TAG, "inquire battery status ok");
     return ESP_OK;
@@ -301,26 +295,24 @@ static esp_err_t bg96_set_working_mode(modem_dce_t *dce, modem_mode_t mode)
     switch (mode) {
     case MODEM_COMMAND_MODE:
         dce->handle_line = bg96_handle_exit_data_mode;
-        DCE_CHECK(dte->send_cmd(dte, "+++\r\n", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
+        DCE_CHECK(dte->send_cmd(dte, "+++", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
         DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "enter command mode failed", err);
         ESP_LOGD(DCE_TAG, "enter command mode ok");
         dce->mode = MODEM_COMMAND_MODE;
         break;
     case MODEM_PPP_MODE:
         dce->handle_line = bg96_handle_atd_ppp;
-        DCE_CHECK(dte->send_cmd(dte, "ATD*99***1#\r\n", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
+        DCE_CHECK(dte->send_cmd(dte, "ATD*99***1#\r", MODEM_COMMAND_TIMEOUT_MODE_CHANGE) == ESP_OK, "send command failed", err);
         DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "enter ppp mode failed", err);
         ESP_LOGD(DCE_TAG, "enter ppp mode ok");
         dce->mode = MODEM_PPP_MODE;
         break;
     case MODEM_CMUX_MODE:
         dce->handle_line = bg96_handle_at_cmux;
-        DCE_CHECK(dte->send_cmd(dte, "AT+CMUX=0\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+        DCE_CHECK(dte->send_cmd(dte, "AT+CMUX=0\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
         DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "enter CMUX mode failed", err);
-        ESP_LOGI(DCE_TAG, "enter CMUX mode OK");
-        printf("A\r\n");
+        ESP_LOGI(DCE_TAG, "enter CMUX mode ok");
         dce->mode = MODEM_CMUX_MODE;
-        printf("B\r\n");
         break;
     default:
         ESP_LOGW(DCE_TAG, "unsupported working mode: %d", mode);
@@ -344,7 +336,7 @@ static esp_err_t bg96_power_down(modem_dce_t *dce)
 {
     modem_dte_t *dte = dce->dte;
     dce->handle_line = bg96_handle_power_down;
-    DCE_CHECK(dte->send_cmd(dte, "AT+QPOWD=1\r\n", MODEM_COMMAND_TIMEOUT_POWEROFF) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT+QPOWD=1\r", MODEM_COMMAND_TIMEOUT_POWEROFF) == ESP_OK, "send command failed", err);
     DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "power down failed", err);
     ESP_LOGD(DCE_TAG, "power down ok");
     return ESP_OK;
@@ -364,7 +356,7 @@ static esp_err_t bg96_get_module_name(bg96_modem_dce_t *bg96_dce)
 {
     modem_dte_t *dte = bg96_dce->parent.dte;
     bg96_dce->parent.handle_line = bg96_handle_cgmm;
-    DCE_CHECK(dte->send_cmd(dte, "AT+CGMM\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT+CGMM\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
     DCE_CHECK(bg96_dce->parent.state == MODEM_STATE_SUCCESS, "get module name failed", err);
     ESP_LOGD(DCE_TAG, "get module name ok");
     return ESP_OK;
@@ -384,7 +376,7 @@ static esp_err_t bg96_get_imei_number(bg96_modem_dce_t *bg96_dce)
 {
     modem_dte_t *dte = bg96_dce->parent.dte;
     bg96_dce->parent.handle_line = bg96_handle_cgsn;
-    DCE_CHECK(dte->send_cmd(dte, "AT+CGSN\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT+CGSN\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
     DCE_CHECK(bg96_dce->parent.state == MODEM_STATE_SUCCESS, "get imei number failed", err);
     ESP_LOGD(DCE_TAG, "get imei number ok");
     return ESP_OK;
@@ -404,7 +396,7 @@ static esp_err_t bg96_get_imsi_number(bg96_modem_dce_t *bg96_dce)
 {
     modem_dte_t *dte = bg96_dce->parent.dte;
     bg96_dce->parent.handle_line = bg96_handle_cimi;
-    DCE_CHECK(dte->send_cmd(dte, "AT+CIMI\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT+CIMI\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
     DCE_CHECK(bg96_dce->parent.state == MODEM_STATE_SUCCESS, "get imsi number failed", err);
     ESP_LOGD(DCE_TAG, "get imsi number ok");
     return ESP_OK;
@@ -426,7 +418,7 @@ static esp_err_t bg96_get_operator_name(bg96_modem_dce_t *bg96_dce)
 {
     modem_dte_t *dte = bg96_dce->parent.dte;
     bg96_dce->parent.handle_line = bg96_handle_cops;
-    DCE_CHECK(dte->send_cmd(dte, "AT+COPS?\r\n", MODEM_COMMAND_TIMEOUT_OPERATOR) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT+COPS?\r", MODEM_COMMAND_TIMEOUT_OPERATOR) == ESP_OK, "send command failed", err);
     DCE_CHECK(bg96_dce->parent.state == MODEM_STATE_SUCCESS, "get network operator failed", err);
     ESP_LOGD(DCE_TAG, "get network operator ok");
     return ESP_OK;
@@ -496,7 +488,7 @@ static esp_err_t bg96_ask_pin(bg96_modem_dce_t *bg96_dce)
 {
     modem_dte_t *dte = bg96_dce->parent.dte;
     bg96_dce->parent.handle_line = bg96_handle_ask_pin;
-    DCE_CHECK(dte->send_cmd(dte, "AT+CPIN?\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send CPIN command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT+CPIN?\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send CPIN command failed", err);
     if (bg96_dce->parent.needpin) {
         #ifdef MODEM_AT_CPIN
             ESP_LOGI(DCE_TAG, "submit PIN");

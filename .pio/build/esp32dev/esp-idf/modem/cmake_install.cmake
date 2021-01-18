@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/components/modem
+# Install script for directory: G:/ESP32_LTE_MQTT/components/modem
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

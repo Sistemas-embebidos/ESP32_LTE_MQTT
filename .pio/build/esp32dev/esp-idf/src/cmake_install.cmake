@@ -1,4 +1,4 @@
-# Install script for directory: C:/Users/JinnKaY/Documents/PlatformIO/Projects/Test/src
+# Install script for directory: G:/ESP32_LTE_MQTT/src
 
 # Set the install prefix
 if(NOT DEFINED CMAKE_INSTALL_PREFIX)

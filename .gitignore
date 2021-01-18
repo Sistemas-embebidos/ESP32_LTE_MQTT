@@ -1,0 +1,5 @@
+.pio
+.vscode
+*.o
+.pio/build/esp32dev/bootloader/.cmake/api/v1/reply/target-efuse_test_table-e311b1b8eaf91580c308.json
+.pio/build/esp32dev/bootloader/.cmake/api/v1/reply/target-encrypted-flash-bd8deadaf743efc182f6.json

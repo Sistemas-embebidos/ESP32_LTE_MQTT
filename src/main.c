@@ -1,39 +1,13 @@
 
 #include "main.h"
 
-#define ESP_WIFI_SSID      "PruebaTBA"
-#define ESP_WIFI_PASS      "pruebaTBA"
-#define ESP_MAXIMUM_RETRY  5
-
-#define THRESHOLD_MIN_DEFAULT 0
-#define THRESHOLD_MAX_DEFAULT 50
-#define RATE_DEFAULT 60
-#define RATE_MIN 10
-#define TEMP_MIN -20
-#define TEMP_MAX 70
-#define STRING_LENGTH_SMALL 30
-#define STRING_LENGTH_BIG 50
-
-#define MAX_BUFFER_RING 200
-
 char configuration[STRING_LENGTH_SMALL];
 int threshold_min = THRESHOLD_MIN_DEFAULT;
 int threshold_max = THRESHOLD_MAX_DEFAULT;
 int rate = RATE_DEFAULT;
 
 //uint32_t data_saved_counter = 0, data_sent_counter = 0;
-bool energia = false;
-
-#define ONE_SEC 1000 / portTICK_PERIOD_MS
-#define LED_RATE 0.25 * ONE_SEC
-#define ADC_RATE 0.5 * ONE_SEC
-#define MQTT_RATE  rate * ONE_SEC
-#define LTE_RATE 5 * ONE_SEC
-#define CONFIG_RATE 1 * ONE_SEC
-#define N_QUEUE 2*MAX_BUFFER_RING
-
-#define DATA_FORMAT "{\"t\":%u,\"T\":[%u,%u,%u],\"B\":%.2f}"
-#define STATE_FORMAT "{\"t\":%u,\"s\":\"%s\"}"
+bool energy = false;
 
 static EventGroupHandle_t wifi_event_group; /* FreeRTOS event group to signal when we are connected*/
 
@@ -41,43 +15,22 @@ static EventGroupHandle_t event_group; /* FreeRTOS event group to signal when we
 
 QueueHandle_t Queue_data,Queue_config;
 
-/* The event group allows multiple bits for each event, but we only care about two events:
- * - we are connected to the AP with an IP
- * - we failed to connect after the maximum amount of retries */
-#define CONNECT_BIT     BIT0
-#define STOP_BIT        BIT1
-#define GOT_DATA_BIT    BIT2
-#define LED_GPIO 2
-#define OFF 0
-#define ON 1
+extern const uint8_t aws_root_ca_pem_start[] asm("_binary_aws_root_ca_pem_start");
+extern const uint8_t aws_root_ca_pem_end[] asm("_binary_aws_root_ca_pem_end");
+extern const uint8_t certificate_pem_crt_start[] asm("_binary_certificate_pem_crt_start");
+extern const uint8_t certificate_pem_crt_end[] asm("_binary_certificate_pem_crt_end");
+extern const uint8_t private_pem_key_start[] asm("_binary_private_pem_key_start");
+extern const uint8_t private_pem_key_end[] asm("_binary_private_pem_key_end");
 
-#define BROKER_USER "f8caa162"
-#define BROKER_PASS "4dfa0cbff7b885ea"
-#define BROKER_HOST "broker.shiftr.io"
+/**
+ * @brief Default MQTT HOST URL is pulled from the aws_iot_config.h
+ */
+char HostAddress[255] = AWS_HOST;
 
-//#define BROKER_URL "mqtt://f8caa162:4dfa0cbff7b885ea@broker.shiftr.io"
-#define BROKER_URL "mqtt://" BROKER_USER ":" BROKER_PASS "@" BROKER_HOST
-
-#define NAME "ESP32_MARTIN"
-
-#define DC_DISCONNECTED_MSG "BATTERY_ONLY"
-#define DC_CONNECTED_MSG "DC_CONNECTED"
-#define HIGH_TEMPERATURE "HIGH_TEMP"
-#define LOW_TEMPERATURE "LOW_TEMP"
-#define NORMAL_TEMPERATURE "NORMAL_TEMP"
-
-#define LTE_TAG "[LTE]"
-#define WIFI_TAG "[WiFi]"
-#define MQTT_TAG "[MQTT]"
-#define SYSTEM_TAG "[System]"
-#define NVS_TAG "[NVS]"
-#define ADC_TAG "[ADC]"
-
-#define STATE_TOPIC "/states"
-#define DATA_TOPIC "/data"
-#define CONFIG_TOPIC "/configuration"
-
-#define STORAGE_NAMESPACE "storage"
+/**
+ * @brief Default MQTT port is pulled from the aws_iot_config.h
+ */
+uint32_t port = AWS_IOT_MQTT_PORT;
 
 static int s_retry_num = 0;
 
@@ -122,7 +75,6 @@ typedef enum
 dc_state_t dc_state = DC_DISCONNECTED;
 
 data_t datas;
-
 static void modem_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     switch (event_id) {
@@ -406,7 +358,7 @@ void lte_start()
     do {
         ESP_LOGI(LTE_TAG, "Trying to initialize modem on GPIO TX: %d / RX: %d", config.tx_io_num, config.rx_io_num);
         
-        dce = bg96_init(dte);
+        dce = sim800_init(dte);
 
         /* create dce object */
         #if CONFIG_EXAMPLE_MODEM_DEVICE_SIM800
@@ -425,8 +377,10 @@ void lte_start()
     /* Enable CMUX */
     esp_modem_start_cmux(dte);
 
-    //ESP_ERROR_CHECK(dce->set_flow_ctrl(dce, MODEM_FLOW_CONTROL_NONE));        // Aca el arduino falla
-    //ESP_ERROR_CHECK(dce->store_profile(dce));                                 // Aca el arduino falla
+    ESP_LOGI(LTE_TAG,"Setting flow control");
+    ESP_ERROR_CHECK(dce->set_flow_ctrl(dce, MODEM_FLOW_CONTROL_NONE));
+    ESP_LOGI(LTE_TAG,"Storing profile");
+    ESP_ERROR_CHECK(dce->store_profile(dce));
     ESP_LOGI(LTE_TAG,"Printing information");
     /* Print Module ID, Operator, IMEI, IMSI */
     ESP_LOGI(LTE_TAG, "Module: %s", dce->name);
@@ -436,25 +390,28 @@ void lte_start()
     ESP_LOGI(LTE_TAG,"Getting signal quality");
     /* Get signal quality */
     uint32_t rssi = 0, ber = 0;
-    //ESP_ERROR_CHECK(dce->get_signal_quality(dce, &rssi, &ber));           // Aca el arduino falla
+    ESP_ERROR_CHECK(dce->get_signal_quality(dce, &rssi, &ber));
     ESP_LOGI(LTE_TAG, "rssi: %d, ber: %d", rssi, ber);
     ESP_LOGI(LTE_TAG,"Getting battery voltage");
     /* Get battery voltage */
     uint32_t voltage = 0, bcs = 0, bcl = 0;
-    //ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));  // Aca el arduino falla
+    ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));
     ESP_LOGI(LTE_TAG, "Battery voltage: %d mV", voltage);
     ESP_LOGI(LTE_TAG,"Configurating PPPos network");
     /* setup PPPoS network parameters */
     #if !defined(CONFIG_EXAMPLE_MODEM_PPP_AUTH_NONE) && (defined(CONFIG_LWIP_PPP_PAP_SUPPORT) || defined(CONFIG_LWIP_PPP_CHAP_SUPPORT))
         esp_netif_ppp_set_auth(esp_netif, auth_type, MODEM_PPP_AUTH_USERNAME, MODEM_PPP_AUTH_PASSWORD);
     #endif
-    ESP_LOGI(LTE_TAG,"Attach the modem to the network interface");
+
     /* attach the modem to the network interface */
-    esp_netif_attach(esp_netif, modem_netif_adapter);   // Aca el arduino falla
-    ESP_LOGI(LTE_TAG,"Waiting IP address");
+    ESP_LOGI(LTE_TAG,"Attaching modem to the network");
+    esp_netif_attach(esp_netif, modem_netif_adapter);
     /* Wait for IP address */
+
+    ESP_LOGI(LTE_TAG,"Waiting IP address");
     xEventGroupWaitBits(event_group, CONNECT_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
 
+    ESP_LOGI(LTE_TAG,"Configuring MQTT");
     /* Config MQTT */
     esp_mqtt_client_config_t mqtt_config = {
         .uri = BROKER_URL,
@@ -688,7 +645,7 @@ static void task_adc_read(void *arg)
         {
             case DC_DISCONNECTED:
             {
-                energia = false;
+                energy = false;
                 if (datas.battery > 0)
                     dc_state = DC_CONNECTING;
                 break;
@@ -706,7 +663,7 @@ static void task_adc_read(void *arg)
             }
             case DC_CONNECTED:
             {
-                energia = true;
+                energy = true;
                 if (datas.battery == 0)
                     dc_state = DC_DISCONNECTING;
                 break;
@@ -749,21 +706,11 @@ static void task_config(void *arg)
 
     while(1) {   
         xQueueReceive( Queue_config, &config, portMAX_DELAY);
-
         int parsedValues[10];
-        int numberOfParsedValues = 0;
-
+    
         //printf( "String to parse: %s\r\n\r\n", config );
-
         // Parsear tl, th y rt
-        numberOfParsedValues = parserJsonIntValues( config, parsedValues );
-
-        //printf( "Number of parsed values: %d\r\n\r\n", numberOfParsedValues );
-
-        //int i = 0;
-        //for( i=0; i<numberOfParsedValues; i++ ) {
-        //    printf( "Parsed value %d: %d\r\n", i, parsedValues[i] );
-        //}
+        parserJsonIntValues( config, parsedValues );
 
         if (parsedValues[0] >= TEMP_MIN)
         {
@@ -871,7 +818,7 @@ static void task_mqtt(void *arg)
 
     while(1) {   
 
-        if (energia)
+        if (energy)
         {
             char* read_value;        
             xQueueReceive( Queue_data, &read_value, portMAX_DELAY);
@@ -933,7 +880,7 @@ void app_main(void)
   
     #if LTE_READY
         lte_start();
-    #elif
+    #else
         wifi_init_sta();
     #endif
 

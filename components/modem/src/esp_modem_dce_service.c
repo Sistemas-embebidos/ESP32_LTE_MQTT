@@ -51,9 +51,7 @@ esp_err_t esp_modem_dce_handle_cmux_sabm(modem_dce_t *dce, const char *frame)
 
 esp_err_t esp_modem_dce_handle_response_default(modem_dce_t *dce, const char *line)
 {
-    
     esp_err_t err = ESP_FAIL;
-    ESP_LOGI("[[ACA]]"," %s ",line);
     if (strstr(line, MODEM_RESULT_CODE_SUCCESS)) {
         err = esp_modem_process_command_done(dce, MODEM_STATE_SUCCESS);
     } else if (strstr(line, MODEM_RESULT_CODE_ERROR)) {
@@ -66,7 +64,7 @@ esp_err_t esp_modem_dce_sync(modem_dce_t *dce)
 {
     modem_dte_t *dte = dce->dte;
     dce->handle_line = esp_modem_dce_handle_response_default;
-    DCE_CHECK(dte->send_cmd(dte, "AT\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
     DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "sync failed", err);
     ESP_LOGD(DCE_TAG, "sync ok");
     return ESP_OK;
@@ -79,11 +77,11 @@ esp_err_t esp_modem_dce_echo(modem_dce_t *dce, bool on)
     modem_dte_t *dte = dce->dte;
     dce->handle_line = esp_modem_dce_handle_response_default;
     if (on) {
-        DCE_CHECK(dte->send_cmd(dte, "ATE1\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+        DCE_CHECK(dte->send_cmd(dte, "ATE1\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
         DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "enable echo failed", err);
         ESP_LOGD(DCE_TAG, "enable echo ok");
     } else {
-        DCE_CHECK(dte->send_cmd(dte, "ATE0\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+        DCE_CHECK(dte->send_cmd(dte, "ATE0\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
         DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "disable echo failed", err);
         ESP_LOGD(DCE_TAG, "disable echo ok");
     }
@@ -95,10 +93,8 @@ err:
 esp_err_t esp_modem_dce_store_profile(modem_dce_t *dce)
 {
     modem_dte_t *dte = dce->dte;
-    ESP_LOGI("[STORE_pro]","AT&W_1");
     dce->handle_line = esp_modem_dce_handle_response_default;
-    ESP_LOGI("[STORE_pro]","AT&W_2");
-    DCE_CHECK(dte->send_cmd(dte, "AT&W\r\n", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "AT&W\r", MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
     DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "save settings failed", err);
     ESP_LOGD(DCE_TAG, "save settings ok");
     return ESP_OK;
@@ -110,10 +106,7 @@ esp_err_t esp_modem_dce_set_flow_ctrl(modem_dce_t *dce, modem_flow_ctrl_t flow_c
 {
     modem_dte_t *dte = dce->dte;
     char command[16];
-
-    ESP_LOGI("[FLOW]","dte-flow_ctrl %d | flow_ctrl %d",dte->flow_ctrl,flow_ctrl);
-
-    int len = snprintf(command, sizeof(command), "AT+IFC=%d,%d\r\n", dte->flow_ctrl, flow_ctrl);
+    int len = snprintf(command, sizeof(command), "AT+IFC=%d,%d\r", dte->flow_ctrl, flow_ctrl);
     DCE_CHECK(len < sizeof(command), "command too long: %s", err, command);
     dce->handle_line = esp_modem_dce_handle_response_default;
     DCE_CHECK(dte->send_cmd(dte, command, MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
@@ -126,7 +119,6 @@ err:
 
 esp_err_t esp_modem_dce_setup_cmux(modem_dce_t *dce)
 {
-    printf("Setup CMUX!\r\n");
     modem_dte_t *dte = dce->dte;
     for (uint8_t i = 0; i < 3; i++)
     {
@@ -146,11 +138,9 @@ esp_err_t esp_modem_dce_define_pdp_context(modem_dce_t *dce, uint32_t cid, const
 {
     modem_dte_t *dte = dce->dte;
     char command[64];
-    int len = snprintf(command, sizeof(command), "AT+CGDCONT=%d,\"%s\",\"%s\"\r\n", cid, type, apn);
+    int len = snprintf(command, sizeof(command), "AT+CGDCONT=%d,\"%s\",\"%s\"\r", cid, type, apn);
     DCE_CHECK(len < sizeof(command), "command too long: %s", err, command);
     dce->handle_line = esp_modem_dce_handle_response_default;
-    ESP_LOGI(DCE_TAG, "Sending: %s",command);
-
     DCE_CHECK(dte->send_cmd(dte, command, MODEM_COMMAND_TIMEOUT_DEFAULT) == ESP_OK, "send command failed", err);
     DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "define pdp context failed", err);
     ESP_LOGD(DCE_TAG, "define pdp context ok");
@@ -163,7 +153,7 @@ esp_err_t esp_modem_dce_hang_up(modem_dce_t *dce)
 {
     modem_dte_t *dte = dce->dte;
     dce->handle_line = esp_modem_dce_handle_response_default;
-    DCE_CHECK(dte->send_cmd(dte, "ATH\r\n", MODEM_COMMAND_TIMEOUT_HANG_UP) == ESP_OK, "send command failed", err);
+    DCE_CHECK(dte->send_cmd(dte, "ATH\r", MODEM_COMMAND_TIMEOUT_HANG_UP) == ESP_OK, "send command failed", err);
     DCE_CHECK(dce->state == MODEM_STATE_SUCCESS, "hang up failed", err);
     ESP_LOGD(DCE_TAG, "hang up ok");
     return ESP_OK;
