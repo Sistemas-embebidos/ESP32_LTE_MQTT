@@ -32,8 +32,6 @@ char HostAddress[255] = AWS_HOST;
  */
 uint32_t port = AWS_IOT_MQTT_PORT;
 
-static int s_retry_num = 0;
-
 esp_mqtt_client_config_t mqtt_cfg = {
         .uri = BROKER_URL,
         .client_id = NAME,
@@ -93,28 +91,6 @@ static void modem_event_handler(void *event_handler_arg, esp_event_base_t event_
     }
 }
 
-static void event_handler(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
-{
-    if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_START) {
-        esp_wifi_connect();
-    } else if (event_base == WIFI_EVENT && event_id == WIFI_EVENT_STA_DISCONNECTED) {
-        if (s_retry_num < ESP_MAXIMUM_RETRY) {
-            esp_wifi_connect();
-            //s_retry_num++;
-            ESP_LOGI(WIFI_TAG, "retry to connect to the AP");
-        } else {
-            xEventGroupSetBits(wifi_event_group, STOP_BIT);
-        }
-        ESP_LOGI(WIFI_TAG,"connect to the AP fail");
-    } else if (event_base == IP_EVENT && event_id == IP_EVENT_STA_GOT_IP) {
-        ip_event_got_ip_t* event = (ip_event_got_ip_t*) event_data;
-        ESP_LOGI(WIFI_TAG, "got ip:%s",
-                 ip4addr_ntoa(&event->ip_info.ip));
-        s_retry_num = 0;
-        xEventGroupSetBits(wifi_event_group, CONNECT_BIT);
-    }
-}
-
 esp_err_t esp32_wifi_eventHandler(void *ctx, system_event_t *event) {
     switch(event->event_id) {
     case SYSTEM_EVENT_STA_START:
@@ -130,7 +106,7 @@ esp_err_t esp32_wifi_eventHandler(void *ctx, system_event_t *event) {
         break;
     case SYSTEM_EVENT_AP_START:
         xEventGroupSetBits(wifi_event_group, GOT_DATA_BIT);
-        ESP_LOGD(LTE_TAG, "AP Started");
+        ESP_LOGD(WIFI_TAG, "AP Started");
         break;
     case SYSTEM_EVENT_AP_STOP:
         xEventGroupClearBits(wifi_event_group, GOT_DATA_BIT);
@@ -247,9 +223,8 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void wifi_init_sta()
 {
-    wifi_event_group = xEventGroupCreate();
-
     tcpip_adapter_init();
+    wifi_event_group = xEventGroupCreate();   
 
     #ifdef USING_WIFI
         ESP_ERROR_CHECK(esp_event_loop_create_default());
@@ -260,8 +235,8 @@ void wifi_init_sta()
     wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
 
     ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &event_handler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &esp32_wifi_eventHandler, NULL));
+    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, IP_EVENT_STA_GOT_IP, &esp32_wifi_eventHandler, NULL));
 
     wifi_config_t wifi_config = {
         .sta = {
