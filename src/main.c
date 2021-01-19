@@ -576,7 +576,7 @@ void aws_iot_task(void *param) {
 
     IoT_Error_t rc = FAILURE;
 
-    AWS_IoT_Client client;
+    AWS_IoT_Client client_AWS;
     IoT_Client_Init_Params mqttInitParams = iotClientInitParamsDefault;
     IoT_Client_Connect_Params connectParams = iotClientConnectParamsDefault;
 
@@ -598,7 +598,7 @@ void aws_iot_task(void *param) {
     mqttInitParams.disconnectHandler = disconnectCallbackHandler;
     mqttInitParams.disconnectHandlerData = NULL;
 
-    rc = aws_iot_mqtt_init(&client, &mqttInitParams);
+    rc = aws_iot_mqtt_init(&client_AWS, &mqttInitParams);
     if(SUCCESS != rc) {
         ESP_LOGE(AMAZON_TAG, "aws_iot_mqtt_init returned error : %d ", rc);
         abort();
@@ -610,36 +610,35 @@ void aws_iot_task(void *param) {
     connectParams.keepAliveIntervalInSec = 10;
     connectParams.isCleanSession = true;
     connectParams.MQTTVersion = MQTT_3_1_1;
-    /* Client ID is set in the menuconfig of the example */
+
     connectParams.pClientID = AWS_CLIENT_ID;
     connectParams.clientIDLen = (uint16_t) strlen(AWS_CLIENT_ID);
     connectParams.isWillMsgPresent = false;
 
     ESP_LOGI(AMAZON_TAG, "Connecting to AWS...");
     do {
-        rc = aws_iot_mqtt_connect(&client, &connectParams);
+        rc = aws_iot_mqtt_connect(&client_AWS, &connectParams);
         if(SUCCESS != rc) {
             ESP_LOGE(AMAZON_TAG, "Error(%d) connecting to %s:%d", rc, mqttInitParams.pHostURL, mqttInitParams.port);
             vTaskDelay(1000 / portTICK_RATE_MS);
         }
     } while(SUCCESS != rc);
 
-    
     // Enable Auto Reconnect functionality. Minimum and Maximum time of Exponential backoff are set in aws_iot_config.h
     //  #AWS_IOT_MQTT_MIN_RECONNECT_WAIT_INTERVAL
     //  #AWS_IOT_MQTT_MAX_RECONNECT_WAIT_INTERVAL
     
-    rc = aws_iot_mqtt_autoreconnect_set_status(&client, true);
+    rc = aws_iot_mqtt_autoreconnect_set_status(&client_AWS, true);
     if(SUCCESS != rc) {
         ESP_LOGE(AMAZON_TAG, "Unable to set Auto Reconnect to true - %d", rc);
         abort();
     }
 
-    const char *TOPIC = "test_topic/esp32";
+    const char *TOPIC = DATA_TOPIC; // "test_topic/esp32"
     const int TOPIC_LEN = strlen(TOPIC);
 
     ESP_LOGI(AMAZON_TAG, "Subscribing...");
-    rc = aws_iot_mqtt_subscribe(&client, TOPIC, TOPIC_LEN, QOS0, iot_subscribe_callback_handler, NULL);
+    rc = aws_iot_mqtt_subscribe(&client_AWS, TOPIC, TOPIC_LEN, QOS0, iot_subscribe_callback_handler, NULL);
     if(SUCCESS != rc) {
         ESP_LOGE(AMAZON_TAG, "Error subscribing : %d ", rc);
         abort();
@@ -654,17 +653,27 @@ void aws_iot_task(void *param) {
     while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)) {
 
         //Max time the yield function will wait for read messages
-        rc = aws_iot_mqtt_yield(&client, 100);
+        rc = aws_iot_mqtt_yield(&client_AWS, 100);
         if(NETWORK_ATTEMPTING_RECONNECT == rc) {
             // If the client is attempting to reconnect we will skip the rest of the loop.
             continue;
         }
 
-        ESP_LOGI(AMAZON_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
-        vTaskDelay(1000 / portTICK_RATE_MS);
+        /*
+        char* read_value;        
+            xQueueReceive( Queue_data, &read_value, portMAX_DELAY);
+            ESP_LOGI(MQTT_TAG, "Sending [%s] data by MQTT",read_value);
+
+            esp_mqtt_client_publish(client, DATA_TOPIC, read_value , 0, 1, 0); 
+            free(read_value);
+        */        
+        
         sprintf(cPayload, "%s : %d ", "hello from ESP32 (QOS0)", i++);
         paramsQOS0.payloadLen = strlen(cPayload);
-        rc = aws_iot_mqtt_publish(&client, TOPIC, TOPIC_LEN, &paramsQOS0);
+        rc = aws_iot_mqtt_publish(&client_AWS, TOPIC, TOPIC_LEN, &paramsQOS0);
+
+        ESP_LOGI(AMAZON_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
+        vTaskDelay(0.5* RATE_MIN * ONE_SEC);
     }
 
     ESP_LOGE(AMAZON_TAG, "An error occurred in the main loop.");
@@ -680,6 +689,7 @@ static void task_led(void *arg)
         gpio_set_level(LED_GPIO, OFF);          // Blink off (output low)
         vTaskDelay(LED_RATE);  
         gpio_set_level(LED_GPIO, ON);          // Blink on (output high)
+        //ESP_LOGI(LED_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(LED_RATE);
     } 
 }
@@ -687,10 +697,10 @@ static void task_led(void *arg)
 static void task_lte(void *arg)
 {  
     while(1) {          
-        /* Get signal quality again */
+
         ESP_LOGI(LTE_TAG,"PROBANDO");
-        //ESP_ERROR_CHECK(dce->get_signal_quality(dce, &rssi, &ber));
-        //ESP_LOGI(LTE_TAG, "rssi: %d, ber: %d", rssi, ber);
+
+        //ESP_LOGI(LTE_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(LTE_RATE);
     } 
 }
@@ -715,7 +725,7 @@ static void task_adc_read(void *arg)
             {
                 ESP_LOGI(ADC_TAG, "Normal Temperature" );
                 sprintf(data,STATE_FORMAT,esp_log_timestamp(),NORMAL_TEMPERATURE);
-                esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                 datas.temperature_alert = false;
             }
         }
@@ -727,7 +737,7 @@ static void task_adc_read(void *arg)
                 {
                     ESP_LOGI(ADC_TAG, "High Temperature" );
                     printf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
-                    esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                     datas.temperature_alert = true;
                 }
 
@@ -735,12 +745,9 @@ static void task_adc_read(void *arg)
                 {
                     ESP_LOGI(ADC_TAG, "Low Temperature" );
                     printf(data,STATE_FORMAT,esp_log_timestamp(),LOW_TEMPERATURE);
-                    esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                     datas.temperature_alert = true;
-                }
-
-
-                
+                }             
             }
         }  
 
@@ -758,7 +765,7 @@ static void task_adc_read(void *arg)
                 if (datas.battery > 0)
                 {
                     sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_CONNECTED_MSG);
-                    esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                     dc_state = DC_CONNECTED;
                     ESP_LOGI(ADC_TAG,DC_CONNECTED_MSG);
                 }
@@ -776,7 +783,7 @@ static void task_adc_read(void *arg)
                 if (datas.battery == 0)
                 {
                     sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_DISCONNECTED_MSG);
-                    esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
                     dc_state = DC_DISCONNECTED;
                     ESP_LOGI(ADC_TAG,DC_DISCONNECTED_MSG);
                 }
@@ -785,6 +792,7 @@ static void task_adc_read(void *arg)
             default:
                 dc_state = DC_CONNECTED;
         }
+        //ESP_LOGI(ADC_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(ADC_RATE);
     } 
 }
@@ -792,13 +800,9 @@ static void task_adc_read(void *arg)
 static void task_nvs(void *arg)
 {
     while(1) {  
-
         ESP_LOGI(NVS_TAG, "Saving data...");
-        
-        //printf("%u\n",xTaskGetTickCount());
         save_read_data(datas);
-        //printf("%u\n",xTaskGetTickCount());
-
+        //ESP_LOGI(NVS_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(rate * ONE_SEC);
     } 
 }
@@ -834,7 +838,7 @@ static void task_config(void *arg)
         }
 
         save_config();
-
+        //ESP_LOGI(SYSTEM_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(CONFIG_RATE);
     } 
 }
@@ -856,7 +860,7 @@ static void task_connector(void* arg)
         if (err != ESP_OK) 
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),"NVS not available" );
-            esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
+            //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
         }
 
         // Read saved counter
@@ -865,7 +869,7 @@ static void task_connector(void* arg)
         if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) 
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
-            esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
+            //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
         }
 
         // Read sent counter
@@ -874,7 +878,7 @@ static void task_connector(void* arg)
         if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND)
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
-            esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
+            //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
         }
         data_sent_counter++;
 
@@ -900,13 +904,13 @@ static void task_connector(void* arg)
                 if (err != ESP_OK)
                 {
                     sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
-                    esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
+                    //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
                 }
             }
         }
         // Close
         nvs_close(my_handle);
-
+        //ESP_LOGI(NVS_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(rate * ONE_SEC);
     }
 }
@@ -930,7 +934,7 @@ static void task_mqtt(void *arg)
             esp_mqtt_client_publish(client, DATA_TOPIC, read_value , 0, 1, 0); 
             free(read_value);
         }
-                
+        //ESP_LOGI(MQTT_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));        
         vTaskDelay(0.5 * RATE_MIN * ONE_SEC);
     } 
 }
@@ -1003,12 +1007,12 @@ void app_main(void)
     #if LTE_READY
     xTaskCreate(task_lte, "task_lte", 2048, NULL, 5, NULL);
     #endif
-    xTaskCreate(task_mqtt, "task_mqtt", 2048, NULL, 5, NULL);
+    //xTaskCreate(task_mqtt, "task_mqtt", 2048, NULL, 5, NULL);
     xTaskCreate(task_config, "task_config", 2048, NULL, 5, NULL);
     xTaskCreate(task_adc_read, "task_adc_read", 2048, NULL, 5, NULL);
     xTaskCreate(task_nvs, "task_nvs", 2048, NULL, 5, NULL);
     xTaskCreate(task_connector, "task_connector", 2048, NULL, 5, NULL);
-    xTaskCreatePinnedToCore(&aws_iot_task, "aws_iot_task", 9216, NULL, 5, NULL, 1);
+    xTaskCreatePinnedToCore(&aws_iot_task, "aws_iot_task", 7500, NULL, 5, NULL, 1);
 }
 
 
