@@ -130,7 +130,17 @@ esp_err_t esp32_wifi_eventHandler(void *ctx, system_event_t *event) {
 
 void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen, IoT_Publish_Message_Params *params, void *pData) {
     ESP_LOGI(AMAZON_TAG, "Subscribe callback");
-    ESP_LOGI(AMAZON_TAG, "%.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
+    //ESP_LOGI(AMAZON_TAG, "%.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
+
+    char* configuration = malloc((int) params->payloadLen);
+    if (configuration != NULL)
+    {
+        memcpy(configuration,(char *)params->payload,(int) params->payloadLen);
+        configuration[(int) params->payloadLen] = '\0';
+        ESP_LOGI(AMAZON_TAG,"%d|%s",(int) params->payloadLen,configuration);
+        // {"tl":-10,"th":50,"rt":30}
+        xQueueSend( Queue_config, &configuration, portMAX_DELAY);
+    }    
 }
 
 void disconnectCallbackHandler(AWS_IoT_Client *pClient, void *data) {
@@ -300,6 +310,7 @@ void wifi_init_sta()
     //ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler));
     //vEventGroupDelete(wifi_event_group);
 }
+
 /*
 void lte_start()
 {
@@ -650,15 +661,6 @@ void aws_iot_task(void *param) {
             continue;
         }
 
-        /*
-        char* read_value;        
-        xQueueReceive( Queue_data, &read_value, portMAX_DELAY);
-        ESP_LOGI(MQTT_TAG, "Sending [%s] data by MQTT",read_value);
-
-        esp_mqtt_client_publish(client, DATA_TOPIC, read_value , 0, 1, 0); 
-        free(read_value);
-        */ 
-
         char* read_value;
 
         printf("[%d | %d | %d]\r\n",uxQueueMessagesWaiting( Queue_data ),uxQueueMessagesWaiting( Queue_config ),uxQueueMessagesWaiting( Queue_state ));
@@ -670,6 +672,16 @@ void aws_iot_task(void *param) {
             paramsQOS0.payload = (void *) read_value;
             paramsQOS0.payloadLen = strlen(read_value);
             rc = aws_iot_mqtt_publish(&client_AWS, DATA_TOPIC, strlen(DATA_TOPIC), &paramsQOS0);
+            free(read_value);
+        }
+
+        if(uxQueueMessagesWaiting( Queue_state ) > 0)
+        {      
+            xQueueReceive( Queue_state, &read_value, 0);
+            ESP_LOGI(MQTT_TAG, "Sending [%s] state by MQTT",read_value);
+            paramsQOS0.payload = (void *) read_value;
+            paramsQOS0.payloadLen = strlen(read_value);
+            rc = aws_iot_mqtt_publish(&client_AWS, STATE_TOPIC, strlen(STATE_TOPIC), &paramsQOS0);
             free(read_value);
         }
     
@@ -713,7 +725,7 @@ static void task_lte(void *arg)
 
 static void task_adc_read(void *arg)
 {
-    char data[STRING_LENGTH_BIG];
+    char* data;
 
     while(1) {  
         datas.timestamp = esp_log_timestamp();
@@ -820,15 +832,15 @@ static void task_nvs(void *arg)
 
 static void task_config(void *arg)
 {
-    char config[STRING_LENGTH_SMALL];
+    char* configuration;
 
     while(1) {   
-        xQueueReceive( Queue_config, &config, portMAX_DELAY);
+        xQueueReceive( Queue_config, &configuration, portMAX_DELAY);
         int parsedValues[10];
     
-        //printf( "String to parse: %s\r\n\r\n", config );
+        printf( "String to parse: %s\r\n\r\n", configuration );
         // Parsear tl, th y rt
-        parserJsonIntValues( config, parsedValues );
+        parserJsonIntValues( configuration, parsedValues );
 
         if (parsedValues[0] >= TEMP_MIN)
         {
@@ -847,7 +859,7 @@ static void task_config(void *arg)
             rate = parsedValues[2];
             ESP_LOGI(SYSTEM_TAG,"MQTT rate: %d seconds",rate);
         }
-
+        free(configuration);
         save_config();
         //ESP_LOGI(SYSTEM_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(CONFIG_RATE);
@@ -872,7 +884,7 @@ static void task_connector(void* arg)
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),"NVS not available" );
             //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
-            xQueueSend( Queue_config, aux, portMAX_DELAY);
+            xQueueSend( Queue_state, aux, portMAX_DELAY);
         }
 
         // Read saved counter
@@ -882,7 +894,7 @@ static void task_connector(void* arg)
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
             //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
-            xQueueSend( Queue_config, aux, portMAX_DELAY);
+            xQueueSend( Queue_state, aux, portMAX_DELAY);
         }
 
         // Read sent counter
@@ -892,7 +904,7 @@ static void task_connector(void* arg)
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
             //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
-            xQueueSend( Queue_config, aux, portMAX_DELAY);
+            xQueueSend( Queue_state, aux, portMAX_DELAY);
         }
         data_sent_counter++;
 
@@ -919,7 +931,7 @@ static void task_connector(void* arg)
                 {
                     sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
                     //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
-                    xQueueSend( Queue_config, aux, portMAX_DELAY);
+                    xQueueSend( Queue_state, aux, portMAX_DELAY);
                 }
             }
         }
@@ -1010,7 +1022,7 @@ void app_main(void)
     adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_11db); // Measure up to 2.2V
 
     Queue_data = xQueueCreate( N_QUEUE , sizeof( message_t ) );
-    Queue_config = xQueueCreate( N_QUEUE , sizeof( char[STRING_LENGTH_BIG] ) );
+    Queue_config = xQueueCreate( N_QUEUE , sizeof( message_t ) );
     Queue_state = xQueueCreate( N_QUEUE , sizeof( char[STRING_LENGTH_BIG] ) );
 
     if( Queue_data == NULL || Queue_config == NULL || Queue_state == NULL )
