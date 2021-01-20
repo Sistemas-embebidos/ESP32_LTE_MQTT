@@ -13,7 +13,7 @@ static EventGroupHandle_t wifi_event_group; /* FreeRTOS event group to signal wh
 
 static EventGroupHandle_t event_group; /* FreeRTOS event group to signal when we are connected*/
 
-QueueHandle_t Queue_data,Queue_config;
+QueueHandle_t Queue_data,Queue_config,Queue_state;
 
 extern const uint8_t aws_root_ca_pem_start[] asm("_binary_aws_root_ca_pem_start");
 extern const uint8_t aws_root_ca_pem_end[] asm("_binary_aws_root_ca_pem_end");
@@ -32,12 +32,12 @@ char HostAddress[255] = AWS_HOST;
  */
 uint32_t port = AWS_IOT_MQTT_PORT;
 
-esp_mqtt_client_config_t mqtt_cfg = {
-        .uri = BROKER_URL,
-        .client_id = NAME,
-    };
+//esp_mqtt_client_config_t mqtt_cfg = {
+//        .uri = BROKER_URL,
+//        .client_id = NAME,
+//    };
 
-esp_mqtt_client_handle_t client;
+//esp_mqtt_client_handle_t client;
 
 typedef struct
 {
@@ -56,11 +56,7 @@ typedef enum
     T_CONFIG
 } type_t;
 
-typedef struct
-{
-    char* payload;
-    type_t type;
-} message_t;
+typedef char* message_t;
 
 typedef enum
 {
@@ -73,6 +69,7 @@ typedef enum
 dc_state_t dc_state = DC_DISCONNECTED;
 
 data_t datas;
+
 static void modem_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
 {
     switch (event_id) {
@@ -199,6 +196,7 @@ static void on_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id
     }
 }
 
+/*
 static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
 {
     client = event->client;
@@ -246,6 +244,7 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     ESP_LOGD(MQTT_TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
     mqtt_event_handler_cb(event_data);
 }
+*/
 
 void wifi_init_sta()
 {
@@ -301,7 +300,7 @@ void wifi_init_sta()
     //ESP_ERROR_CHECK(esp_event_handler_unregister(WIFI_EVENT, ESP_EVENT_ANY_ID, &event_handler));
     //vEventGroupDelete(wifi_event_group);
 }
-
+/*
 void lte_start()
 {
     #if CONFIG_LWIP_PPP_PAP_SUPPORT
@@ -322,7 +321,7 @@ void lte_start()
     event_group = xEventGroupCreate();
 
     ESP_LOGI(LTE_TAG,"Creating modem");
-    /* create dte object */
+    // create dte object
     esp_modem_dte_config_t config = ESP_MODEM_DTE_DEFAULT_CONFIG();
 
     // setup UART specific configuration based on kconfig options 
@@ -341,7 +340,7 @@ void lte_start()
     modem_dte_t *dte = esp_modem_dte_init(&config);
 
     ESP_LOGI(LTE_TAG,"Registing modem handler");
-    /* Register event handler */
+    // Register event handler 
     ESP_ERROR_CHECK(esp_modem_set_event_handler(dte, modem_event_handler, ESP_EVENT_ANY_ID, NULL));
 
     ESP_LOGI(LTE_TAG,"Creating network");
@@ -361,7 +360,7 @@ void lte_start()
         
         dce = sim800_init(dte);
 
-        /* create dce object */
+        // create dce object 
         #if CONFIG_EXAMPLE_MODEM_DEVICE_SIM800
             dce = sim800_init(dte);
         #elif CONFIG_EXAMPLE_MODEM_DEVICE_BG96
@@ -375,7 +374,7 @@ void lte_start()
     assert(dce != NULL);
     
     ESP_LOGI(LTE_TAG,"Enabling CMUX");
-    /* Enable CMUX */
+    // Enable CMUX
     esp_modem_start_cmux(dte);
 
     ESP_LOGI(LTE_TAG,"Setting flow control");
@@ -383,37 +382,37 @@ void lte_start()
     ESP_LOGI(LTE_TAG,"Storing profile");
     ESP_ERROR_CHECK(dce->store_profile(dce));
     ESP_LOGI(LTE_TAG,"Printing information");
-    /* Print Module ID, Operator, IMEI, IMSI */
+    // Print Module ID, Operator, IMEI, IMSI 
     ESP_LOGI(LTE_TAG, "Module: %s", dce->name);
     ESP_LOGI(LTE_TAG, "Operator: %s", dce->oper);
     ESP_LOGI(LTE_TAG, "IMEI: %s", dce->imei);
     ESP_LOGI(LTE_TAG, "IMSI: %s", dce->imsi);
     ESP_LOGI(LTE_TAG,"Getting signal quality");
-    /* Get signal quality */
+    // Get signal quality
     uint32_t rssi = 0, ber = 0;
     ESP_ERROR_CHECK(dce->get_signal_quality(dce, &rssi, &ber));
     ESP_LOGI(LTE_TAG, "rssi: %d, ber: %d", rssi, ber);
     ESP_LOGI(LTE_TAG,"Getting battery voltage");
-    /* Get battery voltage */
+    // Get battery voltage 
     uint32_t voltage = 0, bcs = 0, bcl = 0;
     ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));
     ESP_LOGI(LTE_TAG, "Battery voltage: %d mV", voltage);
     ESP_LOGI(LTE_TAG,"Configurating PPPos network");
-    /* setup PPPoS network parameters */
+    // setup PPPoS network parameters
     #if !defined(CONFIG_EXAMPLE_MODEM_PPP_AUTH_NONE) && (defined(CONFIG_LWIP_PPP_PAP_SUPPORT) || defined(CONFIG_LWIP_PPP_CHAP_SUPPORT))
         esp_netif_ppp_set_auth(esp_netif, auth_type, MODEM_PPP_AUTH_USERNAME, MODEM_PPP_AUTH_PASSWORD);
     #endif
 
-    /* attach the modem to the network interface */
+    // attach the modem to the network interface
     ESP_LOGI(LTE_TAG,"Attaching modem to the network");
     esp_netif_attach(esp_netif, modem_netif_adapter);
-    /* Wait for IP address */
+    // Wait for IP address
 
     ESP_LOGI(LTE_TAG,"Waiting IP address");
     xEventGroupWaitBits(event_group, CONNECT_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
 
     ESP_LOGI(LTE_TAG,"Configuring MQTT");
-    /* Config MQTT */
+    // Config MQTT 
     esp_mqtt_client_config_t mqtt_config = {
         .uri = BROKER_URL,
         .event_handle = mqtt_event_handler,
@@ -423,7 +422,7 @@ void lte_start()
     xEventGroupWaitBits(event_group, GOT_DATA_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
     esp_mqtt_client_destroy(mqtt_client);
 
-    /* Exit PPP mode */
+    // Exit PPP mode 
     // ESP_ERROR_CHECK(esp_modem_stop_ppp(dte));
     // xEventGroupWaitBits(event_group, STOP_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
     #if CONFIG_EXAMPLE_SEND_MSG
@@ -431,8 +430,8 @@ void lte_start()
     ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
     ESP_LOGI(LTE_TAG, "Send send message [%s] ok", message);
     #endif
-
 }
+*/
 
 esp_err_t save_read_data(data_t datas)
 {
@@ -570,9 +569,6 @@ int parserJsonIntValues( char const* json, int* parsedValues )
 }
 
 void aws_iot_task(void *param) {
-    char cPayload[100];
-
-    int32_t i = 0;
 
     IoT_Error_t rc = FAILURE;
 
@@ -585,7 +581,7 @@ void aws_iot_task(void *param) {
     ESP_LOGI(AMAZON_TAG, "AWS IoT SDK Version %d.%d.%d-%s", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_TAG);
 
     mqttInitParams.enableAutoReconnect = false; // We enable this later below
-    mqttInitParams.pHostURL = HostAddress;
+    mqttInitParams.pHostURL = AWS_HOST;//HostAddress;
     mqttInitParams.port = port;
 
     mqttInitParams.pRootCALocation = (const char *)aws_root_ca_pem_start;
@@ -634,20 +630,15 @@ void aws_iot_task(void *param) {
         abort();
     }
 
-    const char *TOPIC = DATA_TOPIC; // "test_topic/esp32"
-    const int TOPIC_LEN = strlen(TOPIC);
-
-    ESP_LOGI(AMAZON_TAG, "Subscribing...");
-    rc = aws_iot_mqtt_subscribe(&client_AWS, TOPIC, TOPIC_LEN, QOS0, iot_subscribe_callback_handler, NULL);
+    ESP_LOGI(AMAZON_TAG, "Subscribing to ... %s", CONFIG_TOPIC);
+    rc = aws_iot_mqtt_subscribe(&client_AWS, CONFIG_TOPIC, strlen(CONFIG_TOPIC), QOS0, iot_subscribe_callback_handler, NULL);
     if(SUCCESS != rc) {
         ESP_LOGE(AMAZON_TAG, "Error subscribing : %d ", rc);
         abort();
     }
-
-    sprintf(cPayload, "%s : %d ", "hello from SDK", i);
+    ESP_LOGI(AMAZON_TAG, "Subscribed!");
 
     paramsQOS0.qos = QOS0;
-    paramsQOS0.payload = (void *) cPayload;
     paramsQOS0.isRetained = 0;
 
     while((NETWORK_ATTEMPTING_RECONNECT == rc || NETWORK_RECONNECTED == rc || SUCCESS == rc)) {
@@ -661,18 +652,33 @@ void aws_iot_task(void *param) {
 
         /*
         char* read_value;        
-            xQueueReceive( Queue_data, &read_value, portMAX_DELAY);
+        xQueueReceive( Queue_data, &read_value, portMAX_DELAY);
+        ESP_LOGI(MQTT_TAG, "Sending [%s] data by MQTT",read_value);
+
+        esp_mqtt_client_publish(client, DATA_TOPIC, read_value , 0, 1, 0); 
+        free(read_value);
+        */ 
+
+        char* read_value;
+
+        printf("[%d | %d | %d]\r\n",uxQueueMessagesWaiting( Queue_data ),uxQueueMessagesWaiting( Queue_config ),uxQueueMessagesWaiting( Queue_state ));
+
+        if(uxQueueMessagesWaiting( Queue_data ) > 0 && energy)
+        {      
+            xQueueReceive( Queue_data, &read_value, 0);
             ESP_LOGI(MQTT_TAG, "Sending [%s] data by MQTT",read_value);
-
-            esp_mqtt_client_publish(client, DATA_TOPIC, read_value , 0, 1, 0); 
+            paramsQOS0.payload = (void *) read_value;
+            paramsQOS0.payloadLen = strlen(read_value);
+            rc = aws_iot_mqtt_publish(&client_AWS, DATA_TOPIC, strlen(DATA_TOPIC), &paramsQOS0);
             free(read_value);
-        */        
-        
-        sprintf(cPayload, "%s : %d ", "hello from ESP32 (QOS0)", i++);
-        paramsQOS0.payloadLen = strlen(cPayload);
-        rc = aws_iot_mqtt_publish(&client_AWS, TOPIC, TOPIC_LEN, &paramsQOS0);
+        }
+    
 
-        ESP_LOGI(AMAZON_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
+        //sprintf(cPayload, "%s : %d ", "hello from ESP32 (QOS0)", i++);
+        //paramsQOS0.payloadLen = strlen(cPayload);
+        //rc = aws_iot_mqtt_publish(&client_AWS, DATA_TOPIC, strlen(DATA_TOPIC), &paramsQOS0);
+
+        //ESP_LOGI(AMAZON_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(0.5* RATE_MIN * ONE_SEC);
     }
 
@@ -726,6 +732,7 @@ static void task_adc_read(void *arg)
                 ESP_LOGI(ADC_TAG, "Normal Temperature" );
                 sprintf(data,STATE_FORMAT,esp_log_timestamp(),NORMAL_TEMPERATURE);
                 //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                xQueueSend( Queue_state, data, portMAX_DELAY);
                 datas.temperature_alert = false;
             }
         }
@@ -738,6 +745,7 @@ static void task_adc_read(void *arg)
                     ESP_LOGI(ADC_TAG, "High Temperature" );
                     printf(data,STATE_FORMAT,esp_log_timestamp(),HIGH_TEMPERATURE);
                     //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    xQueueSend( Queue_state, data, portMAX_DELAY);
                     datas.temperature_alert = true;
                 }
 
@@ -746,6 +754,7 @@ static void task_adc_read(void *arg)
                     ESP_LOGI(ADC_TAG, "Low Temperature" );
                     printf(data,STATE_FORMAT,esp_log_timestamp(),LOW_TEMPERATURE);
                     //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    xQueueSend( Queue_state, data, portMAX_DELAY);
                     datas.temperature_alert = true;
                 }             
             }
@@ -766,6 +775,7 @@ static void task_adc_read(void *arg)
                 {
                     sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_CONNECTED_MSG);
                     //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    xQueueSend( Queue_state, data, portMAX_DELAY);
                     dc_state = DC_CONNECTED;
                     ESP_LOGI(ADC_TAG,DC_CONNECTED_MSG);
                 }
@@ -784,6 +794,7 @@ static void task_adc_read(void *arg)
                 {
                     sprintf(data,STATE_FORMAT,esp_log_timestamp(),DC_DISCONNECTED_MSG);
                     //esp_mqtt_client_publish(client, STATE_TOPIC, data , 0, 1, 0); 
+                    xQueueSend( Queue_state, data, portMAX_DELAY);
                     dc_state = DC_DISCONNECTED;
                     ESP_LOGI(ADC_TAG,DC_DISCONNECTED_MSG);
                 }
@@ -861,6 +872,7 @@ static void task_connector(void* arg)
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),"NVS not available" );
             //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
+            xQueueSend( Queue_config, aux, portMAX_DELAY);
         }
 
         // Read saved counter
@@ -870,6 +882,7 @@ static void task_connector(void* arg)
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
             //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
+            xQueueSend( Queue_config, aux, portMAX_DELAY);
         }
 
         // Read sent counter
@@ -879,6 +892,7 @@ static void task_connector(void* arg)
         {
             sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
             //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
+            xQueueSend( Queue_config, aux, portMAX_DELAY);
         }
         data_sent_counter++;
 
@@ -905,6 +919,7 @@ static void task_connector(void* arg)
                 {
                     sprintf(aux,STATE_FORMAT,esp_log_timestamp(),  "NVS not available" );
                     //esp_mqtt_client_publish(client, STATE_TOPIC, aux , 0, 1, 0); 
+                    xQueueSend( Queue_config, aux, portMAX_DELAY);
                 }
             }
         }
@@ -914,7 +929,7 @@ static void task_connector(void* arg)
         vTaskDelay(rate * ONE_SEC);
     }
 }
-
+/*
 static void task_mqtt(void *arg)
 {
     ESP_LOGI(MQTT_TAG, "Starting MQTT ..." );
@@ -938,7 +953,7 @@ static void task_mqtt(void *arg)
         vTaskDelay(0.5 * RATE_MIN * ONE_SEC);
     } 
 }
-
+*/
 void start_system(void)
 {
     printf("#################################################################\n");
@@ -995,9 +1010,10 @@ void app_main(void)
     adc1_config_channel_atten(ADC1_CHANNEL_6, ADC_ATTEN_11db); // Measure up to 2.2V
 
     Queue_data = xQueueCreate( N_QUEUE , sizeof( message_t ) );
-    Queue_config = xQueueCreate( N_QUEUE , sizeof( char[STRING_LENGTH_SMALL] ) );
+    Queue_config = xQueueCreate( N_QUEUE , sizeof( char[STRING_LENGTH_BIG] ) );
+    Queue_state = xQueueCreate( N_QUEUE , sizeof( char[STRING_LENGTH_BIG] ) );
 
-    if( Queue_data == NULL || Queue_config == NULL)
+    if( Queue_data == NULL || Queue_config == NULL || Queue_state == NULL )
     {
         ESP_LOGE(SYSTEM_TAG,"Not enough memory for queue");
         while(1);

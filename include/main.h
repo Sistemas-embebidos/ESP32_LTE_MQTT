@@ -32,7 +32,6 @@
 #include "nvs.h"
 #include "nvs_flash.h"
 #include "tcpip_adapter.h"
-//#include "protocol_examples_common.h"
 
 #include "sim800.h"
 #include "bg96.h"
@@ -49,7 +48,7 @@
 #include "aws_iot_version.h"
 #include "aws_iot_mqtt_client_interface.h"
 
-#include "mqtt_client.h"
+//#include "mqtt_client.h"
 
 #include "tasks.h"
 #include "modem.h"
