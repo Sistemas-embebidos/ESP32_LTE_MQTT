@@ -662,8 +662,9 @@ void aws_iot_task(void *param) {
         }
 
         char* read_value;
+        char status[STRING_LENGTH_BIG];
 
-        printf("[%d | %d | %d]\r\n",uxQueueMessagesWaiting( Queue_data ),uxQueueMessagesWaiting( Queue_config ),uxQueueMessagesWaiting( Queue_state ));
+        //printf("[%d | %d | %d]\r\n",uxQueueMessagesWaiting( Queue_data ),uxQueueMessagesWaiting( Queue_config ),uxQueueMessagesWaiting( Queue_state ));
 
         if(uxQueueMessagesWaiting( Queue_data ) > 0 && energy)
         {      
@@ -674,21 +675,15 @@ void aws_iot_task(void *param) {
             rc = aws_iot_mqtt_publish(&client_AWS, DATA_TOPIC, strlen(DATA_TOPIC), &paramsQOS0);
             free(read_value);
         }
-
+        
         if(uxQueueMessagesWaiting( Queue_state ) > 0)
         {      
-            xQueueReceive( Queue_state, &read_value, 0);
-            ESP_LOGI(MQTT_TAG, "Sending [%s] state by MQTT",read_value);
-            paramsQOS0.payload = (void *) read_value;
-            paramsQOS0.payloadLen = strlen(read_value);
+            xQueueReceive( Queue_state, status, 0);
+            ESP_LOGI(MQTT_TAG, "Sending [%s] state by MQTT",status);
+            paramsQOS0.payload = (void *) status;
+            paramsQOS0.payloadLen = strlen(status);
             rc = aws_iot_mqtt_publish(&client_AWS, STATE_TOPIC, strlen(STATE_TOPIC), &paramsQOS0);
-            free(read_value);
         }
-    
-
-        //sprintf(cPayload, "%s : %d ", "hello from ESP32 (QOS0)", i++);
-        //paramsQOS0.payloadLen = strlen(cPayload);
-        //rc = aws_iot_mqtt_publish(&client_AWS, DATA_TOPIC, strlen(DATA_TOPIC), &paramsQOS0);
 
         //ESP_LOGI(AMAZON_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(0.5* RATE_MIN * ONE_SEC);
@@ -725,7 +720,7 @@ static void task_lte(void *arg)
 
 static void task_adc_read(void *arg)
 {
-    char* data;
+    char data[STRING_LENGTH_BIG];
 
     while(1) {  
         datas.timestamp = esp_log_timestamp();
