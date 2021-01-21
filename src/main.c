@@ -1,19 +1,19 @@
-
 #include "main.h"
 
-char configuration[STRING_LENGTH_SMALL];
-int threshold_min = THRESHOLD_MIN_DEFAULT;
-int threshold_max = THRESHOLD_MAX_DEFAULT;
+extern data_t datas;
+extern int threshold_min;
+extern int threshold_max;
+
 int rate = RATE_DEFAULT;
 
-//uint32_t data_saved_counter = 0, data_sent_counter = 0;
-bool energy = false;
-
 static EventGroupHandle_t wifi_event_group; /* FreeRTOS event group to signal when we are connected*/
-
-static EventGroupHandle_t event_group; /* FreeRTOS event group to signal when we are connected*/
-
 QueueHandle_t Queue_data,Queue_config,Queue_state;
+typedef char* message_t;
+
+dc_state_t dc_state = DC_DISCONNECTED;
+int threshold_min = THRESHOLD_MIN_DEFAULT;
+int threshold_max = THRESHOLD_MAX_DEFAULT;
+bool energy = false;
 
 extern const uint8_t aws_root_ca_pem_start[] asm("_binary_aws_root_ca_pem_start");
 extern const uint8_t aws_root_ca_pem_end[] asm("_binary_aws_root_ca_pem_end");
@@ -22,69 +22,43 @@ extern const uint8_t certificate_pem_crt_end[] asm("_binary_certificate_pem_crt_
 extern const uint8_t private_pem_key_start[] asm("_binary_private_pem_key_start");
 extern const uint8_t private_pem_key_end[] asm("_binary_private_pem_key_end");
 
-/**
- * @brief Default MQTT HOST URL is pulled from the aws_iot_config.h
- */
-char HostAddress[255] = AWS_HOST;
+extern data_t datas;
+extern int rate;
 
-/**
- * @brief Default MQTT port is pulled from the aws_iot_config.h
- */
-uint32_t port = AWS_IOT_MQTT_PORT;
 
-//esp_mqtt_client_config_t mqtt_cfg = {
-//        .uri = BROKER_URL,
-//        .client_id = NAME,
-//    };
+void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen, IoT_Publish_Message_Params *params, void *pData) {
+    ESP_LOGI(AMAZON_TAG, "Subscribe callback");
+    //ESP_LOGI(AMAZON_TAG, "%.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
 
-//esp_mqtt_client_handle_t client;
+    char* configuration = malloc((int) params->payloadLen);
+    if (configuration != NULL)
+    {
+        memcpy(configuration,(char *)params->payload,(int) params->payloadLen);
+        configuration[(int) params->payloadLen] = '\0';
+        ESP_LOGI(AMAZON_TAG,"%d|%s",(int) params->payloadLen,configuration);
+        // {"tl":-10,"th":50,"rt":30}
+        xQueueSend( Queue_config, &configuration, portMAX_DELAY);
+    }    
+}
 
-typedef struct
-{
-    uint32_t timestamp;
-    uint32_t temperature_1;
-    uint32_t temperature_2;
-    uint32_t temperature_3;
-    uint32_t battery;
-    bool temperature_alert;
-} data_t;
+void disconnectCallbackHandler(AWS_IoT_Client *pClient, void *data) {
+    ESP_LOGW(AMAZON_TAG, "MQTT Disconnect");
+    IoT_Error_t rc = FAILURE;
 
-typedef enum
-{
-    T_DATA,
-    T_STATE,
-    T_CONFIG
-} type_t;
+    if(NULL == pClient) {
+        return;
+    }
 
-typedef char* message_t;
-
-typedef enum
-{
-    DC_DISCONNECTED,
-    DC_CONNECTING,
-    DC_CONNECTED,
-    DC_DISCONNECTING
-} dc_state_t;
-
-dc_state_t dc_state = DC_DISCONNECTED;
-
-data_t datas;
-
-static void modem_event_handler(void *event_handler_arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    switch (event_id) {
-    case ESP_MODEM_EVENT_PPP_START:
-        ESP_LOGI(LTE_TAG, "Modem PPP Started");
-        break;
-    case ESP_MODEM_EVENT_PPP_STOP:
-        ESP_LOGI(LTE_TAG, "Modem PPP Stopped");
-        xEventGroupSetBits(wifi_event_group, STOP_BIT);
-        break;
-    case ESP_MODEM_EVENT_UNKNOWN:
-        ESP_LOGW(LTE_TAG, "Unknow line received: %s", (char *)event_data);
-        break;
-    default:
-        break;
+    if(aws_iot_is_autoreconnect_enabled(pClient)) {
+        ESP_LOGI(AMAZON_TAG, "Auto Reconnect is enabled, Reconnecting attempt will start now");
+    } else {
+        ESP_LOGW(AMAZON_TAG, "Auto Reconnect not enabled. Starting manual reconnect...");
+        rc = aws_iot_mqtt_attempt_reconnect(pClient);
+        if(NETWORK_RECONNECTED == rc) {
+            ESP_LOGW(AMAZON_TAG, "Manual Reconnect Successful");
+        } else {
+            ESP_LOGW(AMAZON_TAG, "Manual Reconnect Failed - %d", rc);
+        }
     }
 }
 
@@ -127,134 +101,6 @@ esp_err_t esp32_wifi_eventHandler(void *ctx, system_event_t *event) {
     }
 	return ESP_OK;
 }
-
-void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen, IoT_Publish_Message_Params *params, void *pData) {
-    ESP_LOGI(AMAZON_TAG, "Subscribe callback");
-    //ESP_LOGI(AMAZON_TAG, "%.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
-
-    char* configuration = malloc((int) params->payloadLen);
-    if (configuration != NULL)
-    {
-        memcpy(configuration,(char *)params->payload,(int) params->payloadLen);
-        configuration[(int) params->payloadLen] = '\0';
-        ESP_LOGI(AMAZON_TAG,"%d|%s",(int) params->payloadLen,configuration);
-        // {"tl":-10,"th":50,"rt":30}
-        xQueueSend( Queue_config, &configuration, portMAX_DELAY);
-    }    
-}
-
-void disconnectCallbackHandler(AWS_IoT_Client *pClient, void *data) {
-    ESP_LOGW(AMAZON_TAG, "MQTT Disconnect");
-    IoT_Error_t rc = FAILURE;
-
-    if(NULL == pClient) {
-        return;
-    }
-
-    if(aws_iot_is_autoreconnect_enabled(pClient)) {
-        ESP_LOGI(AMAZON_TAG, "Auto Reconnect is enabled, Reconnecting attempt will start now");
-    } else {
-        ESP_LOGW(AMAZON_TAG, "Auto Reconnect not enabled. Starting manual reconnect...");
-        rc = aws_iot_mqtt_attempt_reconnect(pClient);
-        if(NETWORK_RECONNECTED == rc) {
-            ESP_LOGW(AMAZON_TAG, "Manual Reconnect Successful");
-        } else {
-            ESP_LOGW(AMAZON_TAG, "Manual Reconnect Failed - %d", rc);
-        }
-    }
-}
-
-static void on_ppp_changed(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    ESP_LOGI(LTE_TAG, "PPP state changed event %d", event_id);
-    if (event_id == NETIF_PPP_ERRORUSER) {
-        /* User interrupted event from esp-netif */
-        esp_netif_t *netif = event_data;
-        ESP_LOGI(LTE_TAG, "User interrupted event from netif:%p", netif);
-    }
-}
-
-static void on_ip_event(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
-{
-    ESP_LOGD(LTE_TAG, "IP event! %d", event_id);
-    if (event_id == IP_EVENT_PPP_GOT_IP) {
-        esp_netif_dns_info_t dns_info;
-
-        ip_event_got_ip_t *event = (ip_event_got_ip_t *)event_data;
-        esp_netif_t *netif = event->esp_netif;
-
-        ESP_LOGI(LTE_TAG, "Modem Connect to PPP Server");
-        ESP_LOGI(LTE_TAG, "~~~~~~~~~~~~~~");
-        ESP_LOGI(LTE_TAG, "IP          : " IPSTR, IP2STR(&event->ip_info.ip));
-        ESP_LOGI(LTE_TAG, "Netmask     : " IPSTR, IP2STR(&event->ip_info.netmask));
-        ESP_LOGI(LTE_TAG, "Gateway     : " IPSTR, IP2STR(&event->ip_info.gw));
-        esp_netif_get_dns_info(netif, 0, &dns_info);
-        ESP_LOGI(LTE_TAG, "Name Server1: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
-        esp_netif_get_dns_info(netif, 1, &dns_info);
-        ESP_LOGI(LTE_TAG, "Name Server2: " IPSTR, IP2STR(&dns_info.ip.u_addr.ip4));
-        ESP_LOGI(LTE_TAG, "~~~~~~~~~~~~~~");
-        xEventGroupSetBits(wifi_event_group, CONNECT_BIT);
-
-        ESP_LOGI(LTE_TAG, "GOT ip event!!!");
-    } else if (event_id == IP_EVENT_PPP_LOST_IP) {
-        ESP_LOGI(LTE_TAG, "Modem Disconnect from PPP Server");
-    } else if (event_id == IP_EVENT_GOT_IP6) {
-        ESP_LOGI(LTE_TAG, "GOT IPv6 event!");
-
-        ip_event_got_ip6_t *event = (ip_event_got_ip6_t *)event_data;
-        ESP_LOGI(LTE_TAG, "Got IPv6 address " IPV6STR, IPV62STR(event->ip6_info.ip));
-    }
-}
-
-/*
-static esp_err_t mqtt_event_handler_cb(esp_mqtt_event_handle_t event)
-{
-    client = event->client;
-    int msg_id;
-    switch (event->event_id) {
-        case MQTT_EVENT_CONNECTED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_CONNECTED");
-            msg_id = esp_mqtt_client_subscribe(client, CONFIG_TOPIC, 0);
-            ESP_LOGI(MQTT_TAG, "sent subscribe successful, msg_id=%d", msg_id);  
-            break;
-        case MQTT_EVENT_DISCONNECTED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DISCONNECTED");
-            break;
-        case MQTT_EVENT_SUBSCRIBED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_UNSUBSCRIBED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_PUBLISHED:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
-            break;
-        case MQTT_EVENT_DATA:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_DATA");
-            //printf("TOPIC=%.*s\r\n", event->topic_len, event->topic);
-            //printf("DATA=%.*s\r\n", event->data_len, event->data);
-            memcpy(configuration,event->data,event->data_len);
-            //printf("DATO=%s\r\n",configuration);
-
-            xQueueSend( Queue_config, &configuration, portMAX_DELAY);
-
-            xEventGroupSetBits(wifi_event_group, GOT_DATA_BIT);
-            break;
-        case MQTT_EVENT_ERROR:
-            ESP_LOGI(MQTT_TAG, "MQTT_EVENT_ERROR");
-            break;
-        default:
-            ESP_LOGI(MQTT_TAG, "Other event id:%d", event->event_id);
-            break;
-    }
-    return ESP_OK;
-}
-
-static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data) {
-    ESP_LOGD(MQTT_TAG, "Event dispatched from event loop base=%s, event_id=%d", base, event_id);
-    mqtt_event_handler_cb(event_data);
-}
-*/
 
 void wifi_init_sta()
 {
@@ -311,275 +157,22 @@ void wifi_init_sta()
     //vEventGroupDelete(wifi_event_group);
 }
 
-/*
-void lte_start()
+static void task_led(void *arg)
 {
-    #if CONFIG_LWIP_PPP_PAP_SUPPORT
-    esp_netif_auth_type_t auth_type = NETIF_PPP_AUTHTYPE_PAP;
-    #elif CONFIG_LWIP_PPP_CHAP_SUPPORT
-    esp_netif_auth_type_t auth_type = NETIF_PPP_AUTHTYPE_CHAP;
-    #elif !defined(CONFIG_EXAMPLE_MODEM_PPP_AUTH_NONE)
-    #error "Unsupported AUTH Negotiation"
-    #endif
+    gpio_reset_pin(LED_GPIO);
+    gpio_set_direction(LED_GPIO, GPIO_MODE_OUTPUT); // Set the GPIO as a push/pull output
 
-    ESP_LOGI(LTE_TAG,"Starting LTE");
-
-    ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-    ESP_ERROR_CHECK(esp_event_handler_register(IP_EVENT, ESP_EVENT_ANY_ID, &on_ip_event, NULL));
-    ESP_ERROR_CHECK(esp_event_handler_register(NETIF_PPP_STATUS, ESP_EVENT_ANY_ID, &on_ppp_changed, NULL));
-
-    event_group = xEventGroupCreate();
-
-    ESP_LOGI(LTE_TAG,"Creating modem");
-    // create dte object
-    esp_modem_dte_config_t config = ESP_MODEM_DTE_DEFAULT_CONFIG();
-
-    // setup UART specific configuration based on kconfig options 
-    config.tx_io_num = MODEM_UART_TX_PIN;
-    config.rx_io_num = MODEM_UART_RX_PIN;
-    //config.rts_io_num = MODEM_UART_RTS_PIN;
-    //config.cts_io_num = MODEM_UART_CTS_PIN;
-    config.rx_buffer_size = MODEM_UART_RX_BUFFER_SIZE;
-    config.tx_buffer_size = MODEM_UART_TX_BUFFER_SIZE;
-    config.pattern_queue_size = MODEM_UART_PATTERN_QUEUE_SIZE;
-    config.event_queue_size = MODEM_UART_EVENT_QUEUE_SIZE;
-    config.event_task_stack_size = MODEM_UART_EVENT_TASK_STACK_SIZE;
-    config.event_task_priority = MODEM_UART_EVENT_TASK_PRIORITY;
-    config.line_buffer_size = MODEM_UART_RX_BUFFER_SIZE / 2;
-
-    modem_dte_t *dte = esp_modem_dte_init(&config);
-
-    ESP_LOGI(LTE_TAG,"Registing modem handler");
-    // Register event handler 
-    ESP_ERROR_CHECK(esp_modem_set_event_handler(dte, modem_event_handler, ESP_EVENT_ANY_ID, NULL));
-
-    ESP_LOGI(LTE_TAG,"Creating network");
-    // Init netif object
-    esp_netif_config_t cfg = ESP_NETIF_DEFAULT_PPP();
-    esp_netif_t *esp_netif = esp_netif_new(&cfg);
-    assert(esp_netif);
-
-    void *modem_netif_adapter = esp_modem_netif_setup(dte);
-    esp_modem_netif_set_default_handlers(modem_netif_adapter, esp_netif);
-
-    ESP_LOGI(LTE_TAG,"Starting network");
-    modem_dce_t *dce = NULL;
-
-    do {
-        ESP_LOGI(LTE_TAG, "Trying to initialize modem on GPIO TX: %d / RX: %d", config.tx_io_num, config.rx_io_num);
-        
-        dce = sim800_init(dte);
-
-        // create dce object 
-        #if CONFIG_EXAMPLE_MODEM_DEVICE_SIM800
-            dce = sim800_init(dte);
-        #elif CONFIG_EXAMPLE_MODEM_DEVICE_BG96
-            dce = bg96_init(dte);
-        #elif CONFIG_EXAMPLE_MODEM_DEVICE_SIM7600
-            dce = sim7600_init(dte);
-        #endif
-        vTaskDelay(LTE_RATE / 10);
-    } while (dce == NULL);
-    
-    assert(dce != NULL);
-    
-    ESP_LOGI(LTE_TAG,"Enabling CMUX");
-    // Enable CMUX
-    esp_modem_start_cmux(dte);
-
-    ESP_LOGI(LTE_TAG,"Setting flow control");
-    ESP_ERROR_CHECK(dce->set_flow_ctrl(dce, MODEM_FLOW_CONTROL_NONE));
-    ESP_LOGI(LTE_TAG,"Storing profile");
-    ESP_ERROR_CHECK(dce->store_profile(dce));
-    ESP_LOGI(LTE_TAG,"Printing information");
-    // Print Module ID, Operator, IMEI, IMSI 
-    ESP_LOGI(LTE_TAG, "Module: %s", dce->name);
-    ESP_LOGI(LTE_TAG, "Operator: %s", dce->oper);
-    ESP_LOGI(LTE_TAG, "IMEI: %s", dce->imei);
-    ESP_LOGI(LTE_TAG, "IMSI: %s", dce->imsi);
-    ESP_LOGI(LTE_TAG,"Getting signal quality");
-    // Get signal quality
-    uint32_t rssi = 0, ber = 0;
-    ESP_ERROR_CHECK(dce->get_signal_quality(dce, &rssi, &ber));
-    ESP_LOGI(LTE_TAG, "rssi: %d, ber: %d", rssi, ber);
-    ESP_LOGI(LTE_TAG,"Getting battery voltage");
-    // Get battery voltage 
-    uint32_t voltage = 0, bcs = 0, bcl = 0;
-    ESP_ERROR_CHECK(dce->get_battery_status(dce, &bcs, &bcl, &voltage));
-    ESP_LOGI(LTE_TAG, "Battery voltage: %d mV", voltage);
-    ESP_LOGI(LTE_TAG,"Configurating PPPos network");
-    // setup PPPoS network parameters
-    #if !defined(CONFIG_EXAMPLE_MODEM_PPP_AUTH_NONE) && (defined(CONFIG_LWIP_PPP_PAP_SUPPORT) || defined(CONFIG_LWIP_PPP_CHAP_SUPPORT))
-        esp_netif_ppp_set_auth(esp_netif, auth_type, MODEM_PPP_AUTH_USERNAME, MODEM_PPP_AUTH_PASSWORD);
-    #endif
-
-    // attach the modem to the network interface
-    ESP_LOGI(LTE_TAG,"Attaching modem to the network");
-    esp_netif_attach(esp_netif, modem_netif_adapter);
-    // Wait for IP address
-
-    ESP_LOGI(LTE_TAG,"Waiting IP address");
-    xEventGroupWaitBits(event_group, CONNECT_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
-
-    ESP_LOGI(LTE_TAG,"Configuring MQTT");
-    // Config MQTT 
-    esp_mqtt_client_config_t mqtt_config = {
-        .uri = BROKER_URL,
-        .event_handle = mqtt_event_handler,
-    };
-    esp_mqtt_client_handle_t mqtt_client = esp_mqtt_client_init(&mqtt_config);
-    esp_mqtt_client_start(mqtt_client);
-    xEventGroupWaitBits(event_group, GOT_DATA_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
-    esp_mqtt_client_destroy(mqtt_client);
-
-    // Exit PPP mode 
-    // ESP_ERROR_CHECK(esp_modem_stop_ppp(dte));
-    // xEventGroupWaitBits(event_group, STOP_BIT, pdTRUE, pdTRUE, portMAX_DELAY);
-    #if CONFIG_EXAMPLE_SEND_MSG
-    const char *message = "Welcome to ESP32!";
-    ESP_ERROR_CHECK(example_send_message_text(dce, CONFIG_EXAMPLE_SEND_MSG_PEER_PHONE_NUMBER, message));
-    ESP_LOGI(LTE_TAG, "Send send message [%s] ok", message);
-    #endif
-}
-*/
-
-esp_err_t save_read_data(data_t datas)
-{
-    nvs_handle_t my_handle;
-    esp_err_t err;
-
-    // Open
-    err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
-    if (err != ESP_OK) return err;
-
-    // Read
-    int32_t data_saved_counter = 0; // value will default to 0, if not set yet in NVS
-    err = nvs_get_i32(my_handle, "saved_counter", &data_saved_counter);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-
-    // Write
-    data_saved_counter++;
-    err = nvs_set_i32(my_handle, "saved_counter", data_saved_counter);
-    if (err != ESP_OK) return err;
-
-    char aux[STRING_LENGTH_BIG];
-    char idx[7];
-
-    sprintf(idx,"i_%d",data_saved_counter % MAX_BUFFER_RING);
-    sprintf(aux,DATA_FORMAT,datas.timestamp,datas.temperature_1,datas.temperature_2,datas.temperature_3,3.3*(float)(datas.battery)/0xFFF);
-    ESP_LOGI(NVS_TAG,"Saving <%s> %s",idx,aux);
-
-    nvs_set_str(my_handle,idx,aux);
-
-    // Commit written value.
-    err = nvs_commit(my_handle);
-    if (err != ESP_OK) return err;
-
-    // Close
-    nvs_close(my_handle);
-    return ESP_OK;
+    while(1) {       
+        gpio_set_level(LED_GPIO, OFF);          // Blink off (output low)
+        vTaskDelay(LED_RATE);  
+        gpio_set_level(LED_GPIO, ON);          // Blink on (output high)
+        //ESP_LOGI(LED_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
+        vTaskDelay(LED_RATE);
+    } 
 }
 
-esp_err_t load_config(void)
+static void aws_iot_task(void *param) 
 {
-    nvs_handle_t my_handle;
-    esp_err_t err;
-
-    // Open
-    err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
-    if (err != ESP_OK) return err;
-
-    // Read threshold_min
-    //int32_t threshold_min = 0; // value will default to 0, if not set yet in NVS
-    err = nvs_get_i32(my_handle, "threshold_min", &threshold_min);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("threshold_min = %d\n", threshold_min);
-
-    // Read threshold_max
-    //int32_t threshold_max = 0; // value will default to 0, if not set yet in NVS
-    err = nvs_get_i32(my_handle, "threshold_max", &threshold_max);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("threshold_max = %d\n", threshold_max);
-
-    // Read rate
-    //int32_t rate = 0; // value will default to 0, if not set yet in NVS
-    err = nvs_get_i32(my_handle, "rate", &rate);
-    if (err != ESP_OK && err != ESP_ERR_NVS_NOT_FOUND) return err;
-    printf("rate = %d\n", rate);
-
-    // Close
-    nvs_close(my_handle);
-    return ESP_OK;
-}
-
-esp_err_t save_config(void)
-{
-    nvs_handle_t my_handle;
-    esp_err_t err;
-
-    // Open
-    err = nvs_open(STORAGE_NAMESPACE, NVS_READWRITE, &my_handle);
-    if (err != ESP_OK) return err;
-
-    // Write
-    err = nvs_set_i32(my_handle, "threshold_min", threshold_min);
-    if (err != ESP_OK) return err;
-
-    // Write
-    err = nvs_set_i32(my_handle, "threshold_max", threshold_max);
-    if (err != ESP_OK) return err;
-
-    // Write
-    err = nvs_set_i32(my_handle, "rate", rate);
-    if (err != ESP_OK) return err;
-
-    // Commit written value.
-    err = nvs_commit(my_handle);
-    if (err != ESP_OK) return err;
-
-    // Close
-    nvs_close(my_handle);
-    return ESP_OK;
-}
-
-int parserJsonIntValues( char const* json, int* parsedValues )
-{
-    bool saveNextChar = false;
-    char stringValue[10];
-    int stringValueIndex = 0;
-    int i = 0;
-    int numberOfParsedValues = 0;
-
-    while( json[i] != '\0' ) {
-        //printf( "i: %d\r\n", i );
-        if( json[i] == ':' ) {
-            saveNextChar = true;
-            i++;
-            continue;
-        }
-        if( json[i] == ',' || json[i] == '}' ) {
-            stringValue[stringValueIndex] = '\0';
-            parsedValues[numberOfParsedValues] = atoi(stringValue); // ASCII to Integer
-            numberOfParsedValues++;
-            stringValueIndex = 0;
-            saveNextChar = false;
-            if( json[i] == '}' ) {
-                return numberOfParsedValues;
-            }
-            i++;
-            continue;
-        }
-        if( saveNextChar ) {
-            stringValue[stringValueIndex] = json[i];
-            stringValueIndex++;
-        }
-        i++;
-    }
-    return numberOfParsedValues;
-}
-
-void aws_iot_task(void *param) {
 
     IoT_Error_t rc = FAILURE;
 
@@ -592,8 +185,8 @@ void aws_iot_task(void *param) {
     ESP_LOGI(AMAZON_TAG, "AWS IoT SDK Version %d.%d.%d-%s", VERSION_MAJOR, VERSION_MINOR, VERSION_PATCH, VERSION_TAG);
 
     mqttInitParams.enableAutoReconnect = false; // We enable this later below
-    mqttInitParams.pHostURL = AWS_HOST;//HostAddress;
-    mqttInitParams.port = port;
+    mqttInitParams.pHostURL = AWS_HOST;
+    mqttInitParams.port = AWS_IOT_MQTT_PORT;
 
     mqttInitParams.pRootCALocation = (const char *)aws_root_ca_pem_start;
     mqttInitParams.pDeviceCertLocation = (const char *)certificate_pem_crt_start;
@@ -691,20 +284,6 @@ void aws_iot_task(void *param) {
 
     ESP_LOGE(AMAZON_TAG, "An error occurred in the main loop.");
     abort();
-}
-
-static void task_led(void *arg)
-{
-    gpio_reset_pin(LED_GPIO);
-    gpio_set_direction(LED_GPIO, GPIO_MODE_OUTPUT); // Set the GPIO as a push/pull output
-
-    while(1) {       
-        gpio_set_level(LED_GPIO, OFF);          // Blink off (output low)
-        vTaskDelay(LED_RATE);  
-        gpio_set_level(LED_GPIO, ON);          // Blink on (output high)
-        //ESP_LOGI(LED_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));
-        vTaskDelay(LED_RATE);
-    } 
 }
 
 static void task_lte(void *arg)
@@ -936,31 +515,8 @@ static void task_connector(void* arg)
         vTaskDelay(rate * ONE_SEC);
     }
 }
-/*
-static void task_mqtt(void *arg)
-{
-    ESP_LOGI(MQTT_TAG, "Starting MQTT ..." );
 
-    client = esp_mqtt_client_init(&mqtt_cfg);
-    esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, client);
-    esp_mqtt_client_start(client);
 
-    while(1) {   
-
-        if (energy)
-        {
-            char* read_value;        
-            xQueueReceive( Queue_data, &read_value, portMAX_DELAY);
-            ESP_LOGI(MQTT_TAG, "Sending [%s] data by MQTT",read_value);
-
-            esp_mqtt_client_publish(client, DATA_TOPIC, read_value , 0, 1, 0); 
-            free(read_value);
-        }
-        //ESP_LOGI(MQTT_TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetTaskName(NULL), uxTaskGetStackHighWaterMark(NULL));        
-        vTaskDelay(0.5 * RATE_MIN * ONE_SEC);
-    } 
-}
-*/
 void start_system(void)
 {
     printf("#################################################################\n");

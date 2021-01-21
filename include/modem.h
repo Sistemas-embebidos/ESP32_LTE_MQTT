@@ -1,3 +1,5 @@
+#ifndef _MODEM_H_
+#define _MODEM_H_
 
 #define MODEM_UART_TX_PIN 17
 #define MODEM_UART_RX_PIN 16
@@ -11,3 +13,5 @@
 #define MODEM_UART_EVENT_TASK_PRIORITY 5
 #define MODEM_PPP_AUTH_USERNAME "adslppp@telefonicanetpa"
 #define MODEM_PPP_AUTH_PASSWORD "adslppp"
+
+#endif
